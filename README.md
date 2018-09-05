@@ -15,9 +15,9 @@ MODULE/
 
 	style.xml <- describes the look of the window
 
-	module.go <- source for the behavior part
+	app.go <- source for the behavior part
 
-	module.so <- behavior part compiled from module.go as plugin (go build -buildmode=plugin)
+	app.so <- behavior part compiled from module.go as plugin (go build -buildmode=plugin)
 
 	README.md <- description of your module
 
