@@ -1,4 +1,4 @@
-package app
+package parser
 
 /*
 handles app.so data
