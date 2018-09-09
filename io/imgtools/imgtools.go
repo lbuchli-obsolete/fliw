@@ -7,6 +7,9 @@ import (
 	"unsafe"
 
 	"github.com/veandco/go-sdl2/sdl"
+
+	_ "image/jpeg"
+	_ "image/png"
 )
 
 /*

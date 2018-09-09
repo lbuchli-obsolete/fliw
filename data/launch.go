@@ -2,46 +2,15 @@ package data
 
 import (
 	"fmt"
+	"log"
+	"plugin"
 
 	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/ttf"
 )
 
 /*
 launches your app using your apps root directory.
 */
-
-var display_size Vector
-
-/*
-###############################################################
-# Section: Initialization
-###############################################################
-*/
-
-func initialize() {
-	// Initialize sdl.sdl and sdl.ttf
-	err := sdl.Init(sdl.INIT_EVERYTHING)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	err = ttf.Init()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	// Get the display size
-	bounds, err := sdl.GetDisplayBounds(0)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	display_size = Vector{bounds.W, bounds.H}
-}
 
 /*
 ##############################################################
@@ -53,6 +22,7 @@ type WindowHandler interface {
 	init(*Container, *bool)
 	update()
 	handleEvent(sdl.Event)
+	GetContainer() *Container
 }
 
 func createWindow(position Vector, size Vector, bgcolor uint32, handler WindowHandler) (err error) {
@@ -60,7 +30,7 @@ func createWindow(position Vector, size Vector, bgcolor uint32, handler WindowHa
 	running := true
 
 	// the main container
-	cont := Container{Vector{0, 0}, size, bgcolor, make(map[string]Item)}
+	cont := handler.GetContainer()
 
 	// create an sdl window for the window struct instance
 	window, err := sdl.CreateWindow("Sidebar", position.X, position.Y,
@@ -80,7 +50,7 @@ func createWindow(position Vector, size Vector, bgcolor uint32, handler WindowHa
 	surface.FillRect(nil, bgcolor)
 
 	// Initialize the handler
-	handler.init(&cont, &running)
+	handler.init(cont, &running)
 
 	// The main loop
 	for running {
@@ -118,8 +88,11 @@ func createWindow(position Vector, size Vector, bgcolor uint32, handler WindowHa
 */
 
 type NormalWindowHandler struct {
-	cont    *Container
-	running *bool
+	cont        *Container
+	running     *bool
+	initializer Initializer
+	updater     Updater
+	handler     EventHandler
 }
 
 func (nwh NormalWindowHandler) init(c *Container, r *bool) {
@@ -127,18 +100,107 @@ func (nwh NormalWindowHandler) init(c *Container, r *bool) {
 	nwh.cont = c
 	nwh.running = r
 
+	nwh.initializer.Initialize(c, r)
 }
 
 func (nwh NormalWindowHandler) update() {
-	return
+	nwh.updater.Update()
 }
 
 func (nwh NormalWindowHandler) handleEvent(event sdl.Event) {
-	return
+	nwh.handler.HandleEvent(event)
+}
+
+func (nwh NormalWindowHandler) GetContainer() (cont *Container) {
+	return nwh.cont
 }
 
 /*
 ##############################################################
-# Section: Parser
+# Section: Launcher
 ##############################################################
 */
+
+type Initializer interface {
+	Initialize(*Container, *bool)
+}
+
+type Updater interface {
+	Update()
+}
+
+type EventHandler interface {
+	HandleEvent(sdl.Event)
+}
+
+// Empty types as fallback default
+
+type DefaultInitializer struct{}
+
+func (di DefaultInitializer) Initialize(cont *Container, running *bool) {
+	return
+}
+
+type DefaultUpdater struct{}
+
+func (du DefaultUpdater) Update() {
+	return
+}
+
+type DefaultEventHandler struct{}
+
+func (deh DefaultEventHandler) HandleEvent(event sdl.Event) {
+	return
+}
+
+func ShowWindow(basecont Container, bgcolor uint32, plug plugin.Plugin) {
+	// Get a function for initializing, updating and eventhandling
+
+	var initializer Initializer
+	var updater Updater
+	var eventhandler EventHandler
+	var ok bool
+
+	// get the initializer type
+	symInitializer, err := plug.Lookup("Initializer")
+	if err != nil {
+		log.Println(err)
+		initializer = DefaultInitializer{}
+	} else {
+		initializer, ok = symInitializer.(Initializer)
+		if !ok {
+			initializer = DefaultInitializer{}
+		}
+	}
+
+	// get the updater type
+	symUpdater, err := plug.Lookup("Updater")
+	if err != nil {
+		log.Println(err)
+		updater = DefaultUpdater{}
+	} else {
+		updater, ok = symUpdater.(Updater)
+		if !ok {
+			updater = DefaultUpdater{}
+		}
+	}
+
+	// get the eventhandler type
+	symHandler, err := plug.Lookup("EventHandler")
+	if err != nil {
+		log.Println(err)
+		eventhandler = DefaultEventHandler{}
+	} else {
+		eventhandler, ok = symHandler.(EventHandler)
+		if !ok {
+			eventhandler = DefaultEventHandler{}
+		}
+	}
+
+	running := true
+
+	handler := NormalWindowHandler{&basecont, &running, initializer, updater, eventhandler}
+
+	// create the window using the handler instance we just declared
+	createWindow(basecont.GetPosition(), basecont.GetSize(), bgcolor, handler)
+}

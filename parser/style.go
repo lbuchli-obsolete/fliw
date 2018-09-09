@@ -86,11 +86,11 @@ type XMLUnicolor struct {
 var bgcolor uint32
 
 // parses XML data to drawable data.* data
-func ParseXMLFile(path string) (maincont *data.Container, bgcolor uint32, windowtype string, err error) {
+func ParseXMLFile(path string) (maincont *data.Container, backgroundcolor uint32, windowtype string, err error) {
 	// open the file
 	file, err := ioutil.ReadFile(path)
 	if err != nil {
-		return maincont, bgcolor, windowtype, err
+		return maincont, backgroundcolor, windowtype, err
 	}
 
 	win := XMLWindow{
@@ -101,16 +101,18 @@ func ParseXMLFile(path string) (maincont *data.Container, bgcolor uint32, window
 	// unmarshal the file
 	err = xml.Unmarshal([]byte(file), &win)
 	if err != nil {
-		return maincont, bgcolor, windowtype, err
+		return maincont, backgroundcolor, windowtype, err
 	}
 
 	// get the display size
 	bounds, err := sdl.GetDisplayBounds(0)
 	if err != nil {
-		return maincont, bgcolor, windowtype, err
+		return maincont, backgroundcolor, windowtype, err
 	}
 
-	return win.Cont.parse(data.Vector{X: bounds.W, Y: bounds.H}), parseColor(win.BGColor), win.WindowType, nil
+	bgcolor = parseColor(win.BGColor)
+
+	return win.Cont.parse(data.Vector{X: bounds.W, Y: bounds.H}), bgcolor, win.WindowType, nil
 }
 
 /*
@@ -166,7 +168,7 @@ func (label XMLLabel) parse(psize data.Vector) (l *data.Label) {
 	return &data.Label{
 		Position: parseXY(label.X, label.Y, psize),
 		Size:     parseXY(label.Width, label.Height, psize),
-		Text:     label.Text,
+		Text:     parseText(label.Text),
 		Textsize: parseInt(label.TextSize),
 		Valign:   parseAlign(label.VAlign),
 		Halign:   parseAlign(label.HAlign),
@@ -202,15 +204,8 @@ func parseColor(color string) (result uint32) {
 		return bgcolor
 	}
 
-	// remove whitespaces before color
-	for strings.ContainsAny("\a\f\t\n\r\v", string(color[0])) {
-		color = color[1:]
-	}
-
-	// remove whitespaces after color
-	for strings.ContainsAny("\a\f\t\n\r\v", string(color[len(color)-1])) {
-		color = color[:len(color)-1]
-	}
+	// remove whitespaces
+	color = cleanString(color)
 
 	if strings.HasPrefix(color, "#") {
 		// Remove # prefix
@@ -235,6 +230,8 @@ func parseColor(color string) (result uint32) {
 
 // parses a string to a bool value. Defaults to false if string is empty
 func parseBool(b string) (result bool) {
+	b = cleanString(b)
+
 	switch b {
 	case "false":
 		return false
@@ -250,6 +247,8 @@ func parseBool(b string) (result bool) {
 
 // parses a string to a data.Align value. Defaults to CENTER if string is empty
 func parseAlign(align string) (result data.Align) {
+	align = cleanString(align)
+
 	switch align {
 	case "top":
 		return data.TOP
@@ -272,6 +271,9 @@ func parseAlign(align string) (result data.Align) {
 // parses x and y strings to a data.Vector size / position. Defaults to 0 if string is empty.
 // Uses parentSize for percentual interpretation
 func parseXY(x string, y string, parentSize data.Vector) (result data.Vector) {
+	x = cleanString(x)
+	y = cleanString(y)
+
 	// function for parsing 1 dimension
 	strparse := func(v string, pv int32) (res int32) {
 		if strings.HasSuffix(v, "%") {
@@ -308,6 +310,8 @@ func parseXY(x string, y string, parentSize data.Vector) (result data.Vector) {
 
 // parses a string to an int. Defaults to 0 if empty
 func parseInt(integer string) (result int) {
+	integer = cleanString(integer)
+
 	if integer == "" {
 		return 0
 	}
@@ -323,6 +327,8 @@ func parseInt(integer string) (result int) {
 
 // parses a string (path) to an *sdl.Surface. Defaults to a unicolored surface if empty
 func parseImage(imagepath string, size data.Vector, downscale bool) (result *sdl.Surface) {
+	imagepath = cleanString(imagepath)
+
 	// get image object from file
 	img, err := imgtools.ImageFromFile(imagepath)
 	if err != nil {
@@ -370,4 +376,28 @@ func parseImage(imagepath string, size data.Vector, downscale bool) (result *sdl
 	}
 
 	return result
+}
+
+// parses a string to a string (removes whitespace before and after)
+func parseText(text string) (result string) {
+	return cleanString(text)
+}
+
+// cleans up whitespace before and after a string
+func cleanString(s string) (cleaned string) {
+	if s == "" {
+		return s
+	}
+
+	// remove whitespaces before
+	for strings.ContainsAny("\a\f\t\n\r\v", string(s[0])) {
+		s = s[1:]
+	}
+
+	// remove whitespaces after
+	for strings.ContainsAny("\a\f\t\n\r\v", string(s[len(s)-1])) {
+		s = s[:len(s)-1]
+	}
+
+	return s
 }
