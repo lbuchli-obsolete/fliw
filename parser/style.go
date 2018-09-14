@@ -24,23 +24,29 @@ type XMLItem interface {
 }
 
 type XMLWindow struct {
-	XMLName    xml.Name     `xml:"window"`
-	WindowType string       `xml:"windowtype,attr"`
-	BGColor    string       `xml:"bgcolor,attr"`
-	Cont       XMLContainer `xml:"container"`
+	XMLName    xml.Name         `xml:"window"`
+	WindowType string           `xml:"windowtype,attr"`
+	BGColor    string           `xml:"bgcolor,attr"`
+	Cont       XMLBaseContainer `xml:"container"`
 }
 
-type XMLContainer struct {
-	XMLName  xml.Name       `xml:"container"`
-	X        string         `xml:"x,attr"`
-	Y        string         `xml:"y,attr"`
-	Width    string         `xml:"width,attr"`
-	Height   string         `xml:"height,attr"`
-	Color    string         `xml:"color,attr"`
-	Conts    []XMLContainer `xml:"container"`
-	Labels   []XMLLabel     `xml:"label"`
-	Textures []XMLTexture   `xml:"texture"`
-	Unicolor []XMLUnicolor  `xml:"unicolor"`
+type XMLBaseContainer struct {
+	XMLName   xml.Name           `xml:"container"`
+	X         string             `xml:"x,attr"`
+	Y         string             `xml:"y,attr"`
+	Width     string             `xml:"width,attr"`
+	Height    string             `xml:"height,attr"`
+	Color     string             `xml:"color,attr"`
+	Conts     []XMLBaseContainer `xml:"container"`
+	ListConts []XMLListContainer `xml:"listcontainer"`
+	Labels    []XMLLabel         `xml:"label"`
+	Textures  []XMLTexture       `xml:"texture"`
+	Unicolor  []XMLUnicolor      `xml:"unicolor"`
+}
+
+type XMLListContainer struct {
+	XMLName xml.Name `xml:"listcontainer"`
+	XMLBaseContainer
 }
 
 type XMLLabel struct {
@@ -86,7 +92,8 @@ type XMLUnicolor struct {
 var bgcolor uint32
 
 // parses XML data to drawable data.* data
-func ParseXMLFile(path string) (maincont *data.Container, backgroundcolor uint32, windowtype string, err error) {
+func ParseXMLFile(path string) (maincont *data.BaseContainer, backgroundcolor uint32, windowtype string, err error) {
+
 	// open the file
 	file, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -122,7 +129,7 @@ func ParseXMLFile(path string) (maincont *data.Container, backgroundcolor uint32
 */
 
 // converts XMLContainer to data.Container
-func (cont XMLContainer) parse(psize data.Vector) (container *data.Container) {
+func (cont XMLBaseContainer) parse(psize data.Vector) (container *data.BaseContainer) {
 	// get the size
 	size := parseXY(cont.Width, cont.Height, psize)
 
@@ -142,14 +149,57 @@ func (cont XMLContainer) parse(psize data.Vector) (container *data.Container) {
 	for it, item := range cont.Conts {
 		itemmap["container"+strconv.Itoa(it)] = item.parse(size)
 	}
+	for it, item := range cont.ListConts {
+		itemmap["listcontainer"+strconv.Itoa(it)] = item.parse(size)
+	}
 
 	// Construct container
-	return &data.Container{
+	return &data.BaseContainer{
 		Position: parseXY(cont.X, cont.Y, psize),
 		Size:     size,
 		BGcolor:  parseColor(cont.Color),
 		Items:    itemmap,
 	}
+}
+
+func (cont XMLListContainer) parse(psize data.Vector) (listcontainer *data.ListContainer) {
+	// get the size
+	size := parseXY(cont.Width, cont.Height, psize)
+
+	// the map of items any data.Container contains
+	itemmap := make(map[string]data.ItemEntry)
+	itemindex := 0
+
+	// Add the items to the list
+	for it, item := range cont.Labels {
+		itemmap["label"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size)}
+		itemindex++
+	}
+	for it, item := range cont.Textures {
+		itemmap["texture"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size)}
+		itemindex++
+	}
+	for it, item := range cont.Unicolor {
+		itemmap["unicolor"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size)}
+		itemindex++
+	}
+	for it, item := range cont.Conts {
+		itemmap["container"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size)}
+		itemindex++
+	}
+	for it, item := range cont.ListConts {
+		itemmap["listcontainer"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size)}
+		itemindex++
+	}
+
+	// Construct container
+	return &data.ListContainer{
+		Position: parseXY(cont.X, cont.Y, psize),
+		Size:     size,
+		BGcolor:  parseColor(cont.Color),
+		Items:    itemmap,
+	}
+
 }
 
 // converts XMLUnicolor to data.Unicolor

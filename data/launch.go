@@ -19,10 +19,10 @@ launches your app using your apps root directory.
 */
 
 type WindowHandler interface {
-	init(*Container, *bool)
+	init(*BaseContainer, *bool)
 	update()
 	handleEvent(sdl.Event)
-	GetContainer() *Container
+	GetContainer() *BaseContainer
 }
 
 func createWindow(position Vector, size Vector, bgcolor uint32, handler WindowHandler) (err error) {
@@ -88,14 +88,14 @@ func createWindow(position Vector, size Vector, bgcolor uint32, handler WindowHa
 */
 
 type NormalWindowHandler struct {
-	cont        *Container
+	cont        *BaseContainer
 	running     *bool
 	initializer Initializer
 	updater     Updater
 	handler     EventHandler
 }
 
-func (nwh NormalWindowHandler) init(c *Container, r *bool) {
+func (nwh NormalWindowHandler) init(c *BaseContainer, r *bool) {
 	// assign variables to nwh instance
 	nwh.cont = c
 	nwh.running = r
@@ -111,7 +111,7 @@ func (nwh NormalWindowHandler) handleEvent(event sdl.Event) {
 	nwh.handler.HandleEvent(event)
 }
 
-func (nwh NormalWindowHandler) GetContainer() (cont *Container) {
+func (nwh NormalWindowHandler) GetContainer() (cont *BaseContainer) {
 	return nwh.cont
 }
 
@@ -122,7 +122,7 @@ func (nwh NormalWindowHandler) GetContainer() (cont *Container) {
 */
 
 type Initializer interface {
-	Initialize(*Container, *bool)
+	Initialize(*BaseContainer, *bool)
 }
 
 type Updater interface {
@@ -137,7 +137,7 @@ type EventHandler interface {
 
 type DefaultInitializer struct{}
 
-func (di DefaultInitializer) Initialize(cont *Container, running *bool) {
+func (di DefaultInitializer) Initialize(cont *BaseContainer, running *bool) {
 	return
 }
 
@@ -153,7 +153,7 @@ func (deh DefaultEventHandler) HandleEvent(event sdl.Event) {
 	return
 }
 
-func ShowWindow(basecont *Container, bgcolor uint32, plug plugin.Plugin) {
+func ShowWindow(basecont *BaseContainer, bgcolor uint32, plug plugin.Plugin) {
 	// Get a function for initializing, updating and eventhandling
 
 	var initializer Initializer

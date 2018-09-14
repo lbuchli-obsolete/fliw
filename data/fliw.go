@@ -65,9 +65,16 @@ type Item interface {
 	SetSize(Vector)
 }
 
+type Container interface {
+	Item
+	AddItem(Item)
+	GetItem(string) Item
+	GetItems() map[string]Item
+}
+
 // This is the first (and the most important) item.
 // It is used to group other items.
-type Container struct {
+type BaseContainer struct {
 	Position Vector
 	Size     Vector
 	BGcolor  uint32
@@ -75,28 +82,28 @@ type Container struct {
 }
 
 // Move the item to a pixel position
-func (cont *Container) MoveItem(item string, pos Vector) {
+func (cont *BaseContainer) MoveItem(item string, pos Vector) {
 	cont.Items[item].SetPosition(pos)
 }
 
 // Move the item to a fraction of the parent container size
-func (cont *Container) MoveItemToFraction(item string, pos FractionVector) {
+func (cont *BaseContainer) MoveItemToFraction(item string, pos FractionVector) {
 	cont.Items[item].SetPosition(Vector{int32(pos.X * float32(cont.Size.X)), int32(pos.Y * float32(cont.Size.Y))})
 }
 
 // Resize an Item to a specific pixel size
-func (cont *Container) ResizeItem(item string, size Vector) {
+func (cont *BaseContainer) ResizeItem(item string, size Vector) {
 	cont.Items[item].SetSize(size)
 }
 
 // Resize an Item to a fraction of the parent container size
-func (cont *Container) ResizeItemToFraction(item string, size FractionVector) {
+func (cont *BaseContainer) ResizeItemToFraction(item string, size FractionVector) {
 	cont.Items[item].SetSize(Vector{int32(size.X * float32(cont.Size.X)), int32(size.Y * float32(cont.Size.Y))})
 }
 
 // draw a container
 // The container will let each item draw onto its own surface and then draw that onto the main surface
-func (cont *Container) Draw(surf *sdl.Surface) (err error) {
+func (cont *BaseContainer) Draw(surf *sdl.Surface) (err error) {
 
 	// let each item draw onto the surface
 	for _, val := range cont.Items {
@@ -129,30 +136,35 @@ func (cont *Container) Draw(surf *sdl.Surface) (err error) {
 }
 
 // Add an item to the container
-func (cont *Container) AddItem(name string, item Item) {
+func (cont *BaseContainer) AddItem(name string, item Item) {
 	cont.Items[name] = item
 }
 
 // Get an item from the container
-func (cont *Container) GetItem(name string) (item Item) {
+func (cont *BaseContainer) GetItem(name string) (item Item) {
 	return cont.Items[name]
+}
+
+// Get all child items of a container
+func (cont *BaseContainer) GetItems() map[string]Item {
+	return cont.Items
 }
 
 // Getters and setters
 
-func (cont *Container) GetPosition() (position Vector) {
+func (cont *BaseContainer) GetPosition() (position Vector) {
 	return cont.Position
 }
 
-func (cont *Container) SetPosition(position Vector) {
+func (cont *BaseContainer) SetPosition(position Vector) {
 	cont.Position = position
 }
 
-func (cont *Container) GetSize() (size Vector) {
+func (cont *BaseContainer) GetSize() (size Vector) {
 	return cont.Size
 }
 
-func (cont *Container) SetSize(size Vector) {
+func (cont *BaseContainer) SetSize(size Vector) {
 	cont.Size = size
 }
 
@@ -161,6 +173,138 @@ func (cont *Container) SetSize(size Vector) {
 # Section: Basic item types
 ####################################################################
 */
+
+/*
+########################
+# Subsection: ListContainer
+########################
+*/
+
+type ItemEntry struct {
+	Index int
+	Item  Item
+}
+
+// Just like a normal container, a listcontainer
+// groups items, but unlike the normal container
+// it wont stack them ontop of each other but list them
+// below each other
+type ListContainer struct {
+	Position Vector
+	Size     Vector
+	BGcolor  uint32
+	Items    map[string]ItemEntry
+}
+
+// Move the item to a pixel position
+// This will determine its margin
+func (cont *ListContainer) MoveItem(item string, pos Vector) {
+	cont.Items[item].Item.SetPosition(pos)
+}
+
+// Move the item to a fraction of the parent container size
+// This will determine its margin
+func (cont *ListContainer) MoveItemToFraction(item string, pos FractionVector) {
+	cont.Items[item].Item.SetPosition(Vector{int32(pos.X * float32(cont.Size.X)), int32(pos.Y * float32(cont.Size.Y))})
+}
+
+// Resize an Item to a specific pixel size
+func (cont *ListContainer) ResizeItem(item string, size Vector) {
+	cont.Items[item].Item.SetSize(size)
+}
+
+// Resize an Item to a fraction of the parent container size
+func (cont *ListContainer) ResizeItemToFraction(item string, size FractionVector) {
+	cont.Items[item].Item.SetSize(Vector{int32(size.X * float32(cont.Size.X)), int32(size.Y * float32(cont.Size.Y))})
+}
+
+// draw a listcontainer
+// The container will let each item draw onto its own surface and then draw that onto the main surface
+// in a listcontainer all items are drawn below each other with item pos y as offset
+func (cont *ListContainer) Draw(surf *sdl.Surface) (err error) {
+
+	yoffset := int32(0)
+
+	items := make([]Item, len(cont.Items))
+
+	// Put items in correct order
+	for _, val := range cont.Items {
+		items[val.Index] = val.Item
+	}
+
+	// let each item draw onto the surface
+	for _, item := range items {
+		pos := item.GetPosition()
+		size := item.GetSize()
+
+		// if not in picure don't draw
+		if yoffset+pos.Y > surf.H {
+			continue
+		}
+
+		isurface, err := sdl.CreateRGBSurface(0, size.X, size.Y, 32, 0, 0, 0, 0)
+		if err != nil {
+			return err
+		}
+
+		// also apply background color
+		// flip bytes for sdl
+		isurface.FillRect(nil, imgtools.UInt32ToColor(cont.BGcolor).Uint32())
+
+		err = item.Draw(isurface)
+		if err != nil {
+			return err
+		}
+
+		// draw the item surface onto the container surface
+		src_rect := sdl.Rect{X: 0, Y: 0, W: size.X, H: size.Y}
+		dst_rect := sdl.Rect{X: pos.X, Y: pos.Y + yoffset, W: pos.X + size.X, H: pos.Y + size.Y}
+		isurface.Blit(&src_rect, surf, &dst_rect)
+
+		isurface.Free()
+
+		yoffset += pos.Y + size.Y
+	}
+
+	return nil
+}
+
+// Add an item to the container
+func (cont *ListContainer) AddItem(name string, item Item) {
+	// index is one bigger than the last one
+	cont.Items[name] = ItemEntry{len(cont.Items), item}
+}
+
+// Get an item from the container
+func (cont *ListContainer) GetItem(name string) (item Item) {
+	return cont.Items[name].Item
+}
+
+// Get all child items of a container
+func (cont *ListContainer) GetItems() (items map[string]Item) {
+	for key, val := range cont.Items {
+		items[key] = val.Item
+	}
+	return
+}
+
+// Getters and setters
+
+func (cont *ListContainer) GetPosition() (position Vector) {
+	return cont.Position
+}
+
+func (cont *ListContainer) SetPosition(position Vector) {
+	cont.Position = position
+}
+
+func (cont *ListContainer) GetSize() (size Vector) {
+	return cont.Size
+}
+
+func (cont *ListContainer) SetSize(size Vector) {
+	cont.Size = size
+}
 
 /*
 ########################
