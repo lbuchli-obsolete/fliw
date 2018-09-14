@@ -106,7 +106,8 @@ func (cont *Container) Draw(surf *sdl.Surface) (err error) {
 		}
 
 		// also apply background color
-		isurface.FillRect(nil, cont.BGcolor)
+		// flip bytes for sdl
+		isurface.FillRect(nil, imgtools.UInt32ToColor(cont.BGcolor).Uint32())
 
 		err = val.Draw(isurface)
 		if err != nil {
@@ -226,7 +227,10 @@ func (label *Label) Draw(surf *sdl.Surface) (err error) {
 
 	dst_rect := sdl.Rect{X: coordinate_x, Y: coordinate_y, W: coordinate_x + text_surface.W, H: coordinate_y + text_surface.H}
 
-	surf.FillRect(nil, label.BGcolor)
+	// Color the background surface
+	// convert to sdl color and back in order to make sure the color
+	// is sdl compatible (no bytes flipped)
+	surf.FillRect(nil, imgtools.UInt32ToColor(label.BGcolor).Uint32())
 
 	// Draw onto final surface (Text aligned)
 	text_surface.Blit(&sdl.Rect{X: 0, Y: 0, W: text_surface.W, H: text_surface.H}, surf, &dst_rect)

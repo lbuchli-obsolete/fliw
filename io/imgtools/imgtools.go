@@ -82,5 +82,5 @@ func ImageFromFile(path string) (img image.Image, err error) {
 
 func UInt32ToColor(ui uint32) (color sdl.Color) {
 	bytes := (*[4]byte)(unsafe.Pointer(&ui))[:]
-	return sdl.Color{R: bytes[2], G: bytes[1], B: bytes[0], A: bytes[3]}
+	return sdl.Color{R: bytes[0], G: bytes[1], B: bytes[2], A: bytes[3]}
 }

@@ -195,10 +195,18 @@ func (tex XMLTexture) parse(psize data.Vector) (texture *data.Texture) {
 */
 
 // parses a string containing a hex color to a uint32
+// representing said color in a sdl-friendly format
 // defaults to bgcolor
-// representing said color
 func parseColor(color string) (result uint32) {
+	return imgtools.UInt32ToColor(parseRawColor(color)).Uint32()
+}
 
+// parses a string containing a hex color to a uint32
+// representing said color
+// defaults to bgcolor
+// if you want sdl to draw the right color, you'll have to use parseColor(),
+// which does the same exept it swaps some bytes
+func parseRawColor(color string) (result uint32) {
 	// return default if not specified
 	if color == "" {
 		return bgcolor
@@ -224,7 +232,7 @@ func parseColor(color string) (result uint32) {
 		val = append(val, 0)
 	}
 
-	// return the byte array as uint32
+	// return the byte array as uint32 (use imgtools to swap color into correct order)
 	return binary.LittleEndian.Uint32(val)
 }
 
