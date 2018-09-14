@@ -90,7 +90,7 @@ func ParseXMLFile(path string) (maincont *data.Container, backgroundcolor uint32
 	// open the file
 	file, err := ioutil.ReadFile(path)
 	if err != nil {
-		return maincont, backgroundcolor, windowtype, err
+		return
 	}
 
 	win := XMLWindow{
@@ -101,13 +101,13 @@ func ParseXMLFile(path string) (maincont *data.Container, backgroundcolor uint32
 	// unmarshal the file
 	err = xml.Unmarshal([]byte(file), &win)
 	if err != nil {
-		return maincont, backgroundcolor, windowtype, err
+		return
 	}
 
 	// get the display size
 	bounds, err := sdl.GetDisplayBounds(0)
 	if err != nil {
-		return maincont, backgroundcolor, windowtype, err
+		return
 	}
 
 	bgcolor = parseColor(win.BGColor)

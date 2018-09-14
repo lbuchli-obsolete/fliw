@@ -193,6 +193,7 @@ func (label *Label) Draw(surf *sdl.Surface) (err error) {
 	if err != nil {
 		return err
 	}
+	defer font.Close()
 
 	// Render text to surface
 	text_surface, err := font.RenderUTF8Shaded(label.Text, imgtools.UInt32ToColor(label.Color), imgtools.UInt32ToColor(label.BGcolor))

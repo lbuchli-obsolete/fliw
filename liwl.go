@@ -41,7 +41,7 @@ func main() {
 		return
 	}
 
-	data.ShowWindow(*cont, bgcolor, *plug)
+	data.ShowWindow(cont, bgcolor, *plug)
 }
 
 func initialize() (err error) {

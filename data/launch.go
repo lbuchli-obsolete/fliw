@@ -153,7 +153,7 @@ func (deh DefaultEventHandler) HandleEvent(event sdl.Event) {
 	return
 }
 
-func ShowWindow(basecont Container, bgcolor uint32, plug plugin.Plugin) {
+func ShowWindow(basecont *Container, bgcolor uint32, plug plugin.Plugin) {
 	// Get a function for initializing, updating and eventhandling
 
 	var initializer Initializer
@@ -199,7 +199,7 @@ func ShowWindow(basecont Container, bgcolor uint32, plug plugin.Plugin) {
 
 	running := true
 
-	handler := NormalWindowHandler{&basecont, &running, initializer, updater, eventhandler}
+	handler := NormalWindowHandler{basecont, &running, initializer, updater, eventhandler}
 
 	// create the window using the handler instance we just declared
 	createWindow(basecont.GetPosition(), basecont.GetSize(), bgcolor, handler)
