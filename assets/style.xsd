@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+<xs:simpleType name="Windowtype">
+	<xs:restriction base="xs:string">
+		<xs:enumeration value="always_on_top"/>
+		<xs:enumeration value="allow_highdpi"/>
+		<xs:enumeration value="borderless"/>
+		<xs:enumeration value="foreign"/>
+		<xs:enumeration value="fullscreen"/>
+		<xs:enumeration value="fullscreen_desktop"/>
+		<xs:enumeration value="hidden"/>
+		<xs:enumeration value="input_focus"/>
+		<xs:enumeration value="input_grabbed"/>
+		<xs:enumeration value="maximized"/>
+		<xs:enumeration value="minimized"/>
+		<xs:enumeration value="mouse_capture"/>
+		<xs:enumeration value="mouse_focus"/>
+		<xs:enumeration value="opengl"/>
+		<xs:enumeration value="popup_menu"/>
+		<xs:enumeration value="resizable"/>
+		<xs:enumeration value="shown"/>
+		<xs:enumeration value="skip_taskbar"/>
+		<xs:enumeration value="tooltip"/>
+		<xs:enumeration value="utility"/>
+		<xs:enumeration value="vulkan"/>
+	</xs:restriction>
+</xs:simpleType>
+
+<xs:complexType name="Item">
+	<xs:attribute name="x"/>
+	<xs:attribute name="y"/>
+	<xs:attribute name="width" use="required"/>
+	<xs:attribute name="height" use="required"/>
+</xs:complexType>
+
+<xs:complexType name="Container">
+	<xs:extention base="Item">
+		<xs:attribute name="color"/>
+	
+		<xs:element name="container" type="Container"
+			minOccurs="0" maxOccurs="unbounded"/>
+		<xs:element name="listcontainer" type="Listcontainer"
+			minOccurs="0" maxOccurs="unbounded"/>
+		<xs:element name="label" type="Label"
+			minOccurs="0" maxOccurs="unbounded"/>
+		<xs:element name="texture" type="Texture"
+			minOccurs="0" maxOccurs="unbounded"/>
+		<xs:element name="unicolor" type="Unicolor"
+			minOccurs="0" maxOccurs="unbounded"/>
+	</xs:extension>
+</xs:complexType>
+
+<xs:complexType name="Listcontainer">
+	<xs:extension base="Container"/>
+</xs:complexType>
+
+<xs:complexType name="Label" type="xs:string">
+	<xs:extension base="Item">
+		<xs:attribute name="textsize" use="required">
+		<xs:attribute name="valign">
+		<xs:attribute name="halign">
+		<xs:attribute name="fgcolor" use="required">
+		<xs:attribute name="bgcolor">
+		<xs:attribute name="bold">
+	</xs:extension>
+</xs:complexType>
+
+<xs:complexType name="Texture" type="xs:string">
+	<xs:extension base="Item">
+		<xs:attribute name="scaledown">
+	</xs:extension>
+</xs:complexType>
+
+<xs:complexType name="Unicolor" type="xs:string">
+	<xs:extension base="Item"/>
+</xs:complexType>
+
+<xs:element name="window">
+	<xs:complexType>
+		<xs:extention base="Container">
+			<xs:attribute name="windowtype" type="Windowtype"/>
+		</xs:extention>
+	</xs:complexType>
+</xs:element>
+
+</xs:schema> 

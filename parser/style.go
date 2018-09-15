@@ -12,6 +12,7 @@ import (
 
 	"github.com/phoenixdevelops/fliw/data"
 	"github.com/phoenixdevelops/fliw/io/imgtools"
+	xsdvalidate "github.com/terminalstatic/go-xsd-validate"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -19,15 +20,39 @@ import (
 parses your style.xml data
 */
 
+// all the window types
+var WindowType = map[string]uint32{
+	"always_on_top":      sdl.WINDOW_ALWAYS_ON_TOP,
+	"allow_highdpi":      sdl.WINDOW_ALLOW_HIGHDPI,
+	"borderless":         sdl.WINDOW_BORDERLESS,
+	"foreign":            sdl.WINDOW_FOREIGN,
+	"fullscreen":         sdl.WINDOW_FULLSCREEN,
+	"fullscreen_desktop": sdl.WINDOW_FULLSCREEN_DESKTOP,
+	"hidden":             sdl.WINDOW_HIDDEN,
+	"input_focus":        sdl.WINDOW_INPUT_FOCUS,
+	"input_grabbed":      sdl.WINDOW_INPUT_GRABBED,
+	"maximized":          sdl.WINDOW_MAXIMIZED,
+	"minimized":          sdl.WINDOW_MINIMIZED,
+	"mouse_capture":      sdl.WINDOW_MOUSE_CAPTURE,
+	"mouse_focus":        sdl.WINDOW_MOUSE_FOCUS,
+	"opengl":             sdl.WINDOW_OPENGL,
+	"popup_menu":         sdl.WINDOW_POPUP_MENU,
+	"resizable":          sdl.WINDOW_RESIZABLE,
+	"shown":              sdl.WINDOW_SHOWN,
+	"skip_taskbar":       sdl.WINDOW_SKIP_TASKBAR,
+	"tooltip":            sdl.WINDOW_TOOLTIP,
+	"utility":            sdl.WINDOW_UTILITY,
+	"vulkan":             sdl.WINDOW_VULKAN,
+}
+
 type XMLItem interface {
 	parse(data.Vector) data.Item
 }
 
 type XMLWindow struct {
-	XMLName    xml.Name         `xml:"window"`
-	WindowType string           `xml:"windowtype,attr"`
-	BGColor    string           `xml:"bgcolor,attr"`
-	Cont       XMLBaseContainer `xml:"container"`
+	XMLName    xml.Name `xml:"window"`
+	WindowType string   `xml:"windowtype,attr"`
+	XMLBaseContainer
 }
 
 type XMLBaseContainer struct {
@@ -90,9 +115,12 @@ type XMLUnicolor struct {
 */
 
 var bgcolor uint32
+var bounds sdl.Rect
+var plug *Plugin
 
-// parses XML data to drawable data.* data
-func ParseXMLFile(path string) (maincont *data.BaseContainer, backgroundcolor uint32, windowtype string, err error) {
+// gives back a XMLWIndow object which can be parsed further
+func UnmarshalXMLFile(path string, p *Plugin) (window XMLWindow, windowtype uint32, err error) {
+	plug = p
 
 	// open the file
 	file, err := ioutil.ReadFile(path)
@@ -100,8 +128,18 @@ func ParseXMLFile(path string) (maincont *data.BaseContainer, backgroundcolor ui
 		return
 	}
 
+	// validate xml file.
+	// it will be validated against
+	// assets/style.xsd
+	ok, err := validateXMLFile(file)
+	if !ok {
+		log.Println("XML config contained errors.")
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	win := XMLWindow{
-		BGColor:    "0x10171e",
 		WindowType: "popup_menu",
 	}
 
@@ -112,14 +150,55 @@ func ParseXMLFile(path string) (maincont *data.BaseContainer, backgroundcolor ui
 	}
 
 	// get the display size
-	bounds, err := sdl.GetDisplayBounds(0)
+	bounds, err = sdl.GetDisplayBounds(0)
 	if err != nil {
 		return
 	}
 
-	bgcolor = parseColor(win.BGColor)
+	// default to sdl.WINDOW_SHOWN
+	if win.WindowType == "" {
+		return win, WindowType["shown"], err
+	}
 
-	return win.Cont.parse(data.Vector{X: bounds.W, Y: bounds.H}), bgcolor, win.WindowType, nil
+	return win, WindowType[win.WindowType], err
+}
+
+// get a drawable data.Container from an XMLWIndow
+func (win *XMLWindow) Parse() (maincont *data.BaseContainer) {
+	return win.parse(data.Vector{X: bounds.W, Y: bounds.H})
+}
+
+func validateXMLFile(file []byte) (valid bool, err error) {
+
+	// validate xml with an xsd file
+	xsdvalidate.Init()
+	defer xsdvalidate.Cleanup()
+	xsdhandler, err := xsdvalidate.NewXsdHandlerUrl("assets/style.xsd", xsdvalidate.ParsErrDefault)
+	if err != nil {
+		return true, err
+	}
+	defer xsdhandler.Free()
+
+	xmlhandler, err := xsdvalidate.NewXmlHandlerMem(file, xsdvalidate.ParsErrDefault)
+	if err != nil {
+		return true, err
+	}
+	defer xmlhandler.Free()
+
+	err = xsdhandler.Validate(xmlhandler, xsdvalidate.ValidErrDefault)
+	if err != nil {
+		switch err.(type) {
+		case xsdvalidate.ValidationError:
+			log.Println(err)
+			log.Printf("Error in line: %d\n", err.(xsdvalidate.ValidationError).Errors[0].Line)
+			log.Println(err.(xsdvalidate.ValidationError).Errors[0].Message)
+			return false, nil
+		default:
+			return true, err
+		}
+	}
+
+	return true, nil
 }
 
 /*
@@ -265,6 +344,9 @@ func parseRawColor(color string) (result uint32) {
 	// remove whitespaces
 	color = cleanString(color)
 
+	// preprocess
+	color = plug.PreParseString(color)
+
 	if strings.HasPrefix(color, "#") {
 		// Remove # prefix
 		color = color[1:]
@@ -290,6 +372,9 @@ func parseRawColor(color string) (result uint32) {
 func parseBool(b string) (result bool) {
 	b = cleanString(b)
 
+	// preprocess
+	b = plug.PreParseString(b)
+
 	switch b {
 	case "false":
 		return false
@@ -306,6 +391,9 @@ func parseBool(b string) (result bool) {
 // parses a string to a data.Align value. Defaults to CENTER if string is empty
 func parseAlign(align string) (result data.Align) {
 	align = cleanString(align)
+
+	// preprocess
+	align = plug.PreParseString(align)
 
 	switch align {
 	case "top":
@@ -331,6 +419,10 @@ func parseAlign(align string) (result data.Align) {
 func parseXY(x string, y string, parentSize data.Vector) (result data.Vector) {
 	x = cleanString(x)
 	y = cleanString(y)
+
+	// preprocess
+	x = plug.PreParseString(x)
+	y = plug.PreParseString(y)
 
 	// function for parsing 1 dimension
 	strparse := func(v string, pv int32) (res int32) {
@@ -370,6 +462,9 @@ func parseXY(x string, y string, parentSize data.Vector) (result data.Vector) {
 func parseInt(integer string) (result int) {
 	integer = cleanString(integer)
 
+	// preprocess
+	integer = plug.PreParseString(integer)
+
 	if integer == "" {
 		return 0
 	}
@@ -383,9 +478,21 @@ func parseInt(integer string) (result int) {
 	return result
 }
 
+// a map of images already loaded and converted to a surface
+var loadedimages = make(map[string]*sdl.Surface)
+
 // parses a string (path) to an *sdl.Surface. Defaults to a unicolored surface if empty
 func parseImage(imagepath string, size data.Vector, downscale bool) (result *sdl.Surface) {
 	imagepath = cleanString(imagepath)
+
+	// preprocess
+	imagepath = plug.PreParseString(imagepath)
+
+	// return the already processed value of that image
+	// if existent
+	if val, ok := loadedimages[imagepath]; ok {
+		return val
+	}
 
 	// get image object from file
 	img, err := imgtools.ImageFromFile(imagepath)
@@ -433,12 +540,16 @@ func parseImage(imagepath string, size data.Vector, downscale bool) (result *sdl
 		result = surf
 	}
 
+	// also save the image in a map of already loaded images
+	loadedimages[imagepath] = result
+
 	return result
 }
 
 // parses a string to a string (removes whitespace before and after)
 func parseText(text string) (result string) {
-	return cleanString(text)
+	text = cleanString(text)
+	return plug.PreParseString(text)
 }
 
 // cleans up whitespace before and after a string

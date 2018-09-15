@@ -7,13 +7,10 @@ You'll just have to give it the path to the root folder of your app
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"plugin"
 
-	"github.com/phoenixdevelops/fliw/data"
-	"github.com/phoenixdevelops/fliw/parser"
+	"github.com/phoenixdevelops/fliw/launch"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 )
@@ -21,7 +18,6 @@ import (
 func main() {
 	args := os.Args[1:]
 	log.Println(args)
-	// TODO launch app
 
 	// Initialization
 	err := initialize()
@@ -29,19 +25,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	cont, bgcolor, windowtype, err := parser.ParseXMLFile("/home/lukas/go/src/fliwexamples/basic/style.xml")
-	fmt.Println("Container: ", cont)
-	fmt.Println("Color: ", bgcolor)
-	fmt.Println("Windowtype", windowtype)
-	fmt.Println("Error: ", err)
-
-	plug, err := plugin.Open("/home/lukas/go/src/fliwexamples/basic/app.so")
+	// TODO change path to args[0]
+	err = launch.ShowWindow("/home/lukas/go/src/fliwexamples/basic")
 	if err != nil {
 		log.Fatal(err)
-		return
 	}
-
-	data.ShowWindow(cont, bgcolor, *plug)
 }
 
 func initialize() (err error) {
