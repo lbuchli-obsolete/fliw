@@ -169,7 +169,6 @@ func (win *XMLWindow) Parse() (maincont *data.BaseContainer) {
 }
 
 func validateXMLFile(file []byte) (valid bool, err error) {
-
 	// validate xml with an xsd file
 	xsdvalidate.Init()
 	defer xsdvalidate.Cleanup()
