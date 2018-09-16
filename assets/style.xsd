@@ -28,10 +28,10 @@
 </xs:simpleType>
 
 <xs:complexType name="Item">
-	<xs:attribute name="x" />
-	<xs:attribute name="y" />
-	<xs:attribute name="width" />
-	<xs:attribute name="height" />
+	<xs:attribute name="x" default="0" />
+	<xs:attribute name="y" default="0" />
+	<xs:attribute name="width" default="100%" />
+	<xs:attribute name="height" default="100%" />
 </xs:complexType>
 
 <xs:complexType name="Container">
@@ -49,7 +49,7 @@
 				<xs:element name="unicolor" type="Unicolor"
 					minOccurs="0" maxOccurs="unbounded" />
 			</xs:choice>
-			<xs:attribute name="color" />
+			<xs:attribute name="color" default="#000000" />
 		</xs:extension>
 	</xs:complexContent>
 </xs:complexType>
@@ -81,11 +81,11 @@
 	<xs:complexContent>
 		<xs:extension base="Item">
 			<xs:attribute name="textsize" use="required" />
-			<xs:attribute name="valign" type="Valign" />
-			<xs:attribute name="halign" type="Halign" />
+			<xs:attribute name="valign" type="Valign" default="center" />
+			<xs:attribute name="halign" type="Halign" default="center" />
 			<xs:attribute name="fgcolor" use="required" />
-			<xs:attribute name="bgcolor" />
-			<xs:attribute name="bold" />
+			<xs:attribute name="bgcolor"/>
+			<xs:attribute name="bold" default="false" />
 		</xs:extension>
 	</xs:complexContent>
 </xs:complexType>
@@ -93,7 +93,7 @@
 <xs:complexType name="Texture" mixed="true" >
 	<xs:complexContent>
 		<xs:extension base="Item">
-			<xs:attribute name="scaledown" />
+			<xs:attribute name="scaledown" default="false" />
 		</xs:extension>
 	</xs:complexContent>
 </xs:complexType>
@@ -109,7 +109,7 @@
 	<xs:complexType>
 		<xs:complexContent>
 			<xs:extension base="Container">
-				<xs:attribute name="windowtype" type="Windowtype" />
+				<xs:attribute name="windowtype" type="Windowtype" default="shown" />
 			</xs:extension>
 		</xs:complexContent>
 	</xs:complexType>
