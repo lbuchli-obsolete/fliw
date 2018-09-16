@@ -54,7 +54,13 @@ func (p *Plugin) CallFunction(name string) (returned string) {
 
 	value, ok := symFunc.(func() string)
 	if !ok {
-		log.Fatal("Could not cast value of variable ", name)
+		value, ok := symFunc.(func())
+		if !ok {
+			log.Fatal("Could not cast value of variable ", name)
+			return ""
+		}
+		value()
+		return ""
 	}
 
 	return value()

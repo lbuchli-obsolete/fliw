@@ -45,8 +45,12 @@ var WindowType = map[string]uint32{
 	"vulkan":             sdl.WINDOW_VULKAN,
 }
 
-type XMLItem interface {
-	parse(data.Vector) data.Item
+type XMLItem struct {
+	X       string `xml:"x,attr"`
+	Y       string `xml:"y,attr"`
+	Width   string `xml:"width,attr"`
+	Height  string `xml:"height,attr"`
+	OnEvent string `xml:"onevent,attr"`
 }
 
 type XMLWindow struct {
@@ -56,11 +60,8 @@ type XMLWindow struct {
 }
 
 type XMLBaseContainer struct {
-	XMLName   xml.Name           `xml:"container"`
-	X         string             `xml:"x,attr"`
-	Y         string             `xml:"y,attr"`
-	Width     string             `xml:"width,attr"`
-	Height    string             `xml:"height,attr"`
+	XMLName xml.Name `xml:"container"`
+	XMLItem
 	Color     string             `xml:"color,attr"`
 	Conts     []XMLBaseContainer `xml:"container"`
 	ListConts []XMLListContainer `xml:"listcontainer"`
@@ -75,37 +76,28 @@ type XMLListContainer struct {
 }
 
 type XMLLabel struct {
-	XMLName  xml.Name `xml:"label"`
-	X        string   `xml:"x,attr"`
-	Y        string   `xml:"y,attr"`
-	Width    string   `xml:"width,attr"`
-	Height   string   `xml:"height,attr"`
-	TextSize string   `xml:"textsize,attr"`
-	VAlign   string   `xml:"valign,attr"`
-	HAlign   string   `xml:"halign,attr"`
-	FGColor  string   `xml:"fgcolor,attr"`
-	BGColor  string   `xml:"bgcolor,attr"`
-	Bold     string   `xml:"bold,attr"`
-	Text     string   `xml:",chardata"`
+	XMLName xml.Name `xml:"label"`
+	XMLItem
+	TextSize string `xml:"textsize,attr"`
+	VAlign   string `xml:"valign,attr"`
+	HAlign   string `xml:"halign,attr"`
+	FGColor  string `xml:"fgcolor,attr"`
+	BGColor  string `xml:"bgcolor,attr"`
+	Bold     string `xml:"bold,attr"`
+	Text     string `xml:",chardata"`
 }
 
 type XMLTexture struct {
-	XMLName   xml.Name `xml:"texture"`
-	X         string   `xml:"x,attr"`
-	Y         string   `xml:"y,attr"`
-	Width     string   `xml:"width,attr"`
-	Height    string   `xml:"height,attr"`
-	Texture   string   `xml:",chardata"`
-	ScaleDown string   `xml:"scaledown,attr"`
+	XMLName xml.Name `xml:"texture"`
+	XMLItem
+	Texture   string `xml:",chardata"`
+	ScaleDown string `xml:"scaledown,attr"`
 }
 
 type XMLUnicolor struct {
 	XMLName xml.Name `xml:"unicolor"`
-	X       string   `xml:"x,attr"`
-	Y       string   `xml:"y,attr"`
-	Width   string   `xml:"width,attr"`
-	Height  string   `xml:"height,attr"`
-	Color   string   `xml:",chardata"`
+	XMLItem
+	Color string `xml:",chardata"`
 }
 
 /*
@@ -238,6 +230,7 @@ func (cont XMLBaseContainer) parse(psize data.Vector) (container *data.BaseConta
 		Size:     size,
 		BGcolor:  parseColor(cont.Color),
 		Items:    itemmap,
+		Events:   parseEvents(cont.OnEvent),
 	}
 }
 
@@ -277,6 +270,7 @@ func (cont XMLListContainer) parse(psize data.Vector) (listcontainer *data.ListC
 		Size:     size,
 		BGcolor:  parseColor(cont.Color),
 		Items:    itemmap,
+		Events:   parseEvents(cont.OnEvent),
 	}
 
 }
@@ -288,6 +282,7 @@ func (uni XMLUnicolor) parse(psize data.Vector) (unicolor *data.Unicolor) {
 		Position: parseXY(uni.X, uni.Y, psize),
 		Size:     parseWH(uni.Width, uni.Height, psize),
 		Color:    parseColor(uni.Color),
+		Events:   parseEvents(uni.OnEvent),
 	}
 }
 
@@ -304,6 +299,7 @@ func (label XMLLabel) parse(psize data.Vector) (l *data.Label) {
 		Color:    parseColor(label.FGColor),
 		BGcolor:  parseColor(label.BGColor),
 		Bold:     parseBool(label.Bold),
+		Events:   parseEvents(label.OnEvent),
 	}
 }
 
@@ -314,6 +310,7 @@ func (tex XMLTexture) parse(psize data.Vector) (texture *data.Texture) {
 		Position: parseXY(tex.X, tex.Y, psize),
 		Size:     parseWH(tex.Width, tex.Height, psize),
 		Texture:  parseImage(tex.Texture, parseXY(tex.Width, tex.Height, psize), parseBool(tex.ScaleDown)),
+		Events:   parseEvents(tex.OnEvent),
 	}
 }
 
@@ -558,6 +555,29 @@ func parseImage(imagepath string, size data.Vector, downscale bool) (result *sdl
 func parseText(text string) (result string) {
 	text = cleanString(text)
 	return plug.PreParseString(text)
+}
+
+// parses an ItemEvents struct to a map of events understood by the data package
+// Entries may look like this:
+// onevent="click:func1,rightclick:func2"
+func parseEvents(onevent string) (result map[string]string) {
+	result = make(map[string]string)
+
+	onevent = cleanString(onevent)
+
+	entries := strings.Split(onevent, ",")
+
+	for _, entry := range entries {
+		data := strings.Split(entry, ":")
+
+		if len(data) == 2 {
+			data[0] = parseText(data[0])
+			data[1] = parseText(data[1])
+			result[data[0]] = data[1]
+		}
+	}
+
+	return
 }
 
 // cleans up whitespace before and after a string

@@ -32,6 +32,7 @@
 	<xs:attribute name="y" default="0" />
 	<xs:attribute name="width" default="100%" />
 	<xs:attribute name="height" default="100%" />
+	<xs:attribute name="onevent" />
 </xs:complexType>
 
 <xs:complexType name="Container">

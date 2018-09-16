@@ -50,6 +50,16 @@ const (
 	SUBTEXT   int = 14
 )
 
+// unused function that will fail to compile
+// if any of the listed structs are not in the interface
+func checkSatisfaction() {
+	var _ Container = (*BaseContainer)(nil)
+	var _ Container = (*ListContainer)(nil)
+	var _ Item = (*Label)(nil)
+	var _ Item = (*Texture)(nil)
+	var _ Item = (*Unicolor)(nil)
+}
+
 /*
 ###############################################################
 # Section: Item & Container
@@ -63,13 +73,20 @@ type Item interface {
 	SetPosition(Vector)
 	GetSize() Vector
 	SetSize(Vector)
+	GetEvent(string) string
+	GetEvents() map[string]string
 }
 
 type Container interface {
 	Item
-	AddItem(Item)
+	MoveItem(string, Vector)
+	MoveItemToFraction(string, FractionVector)
+	ResizeItem(string, Vector)
+	ResizeItemToFraction(string, FractionVector)
+	AddItem(string, Item)
 	GetItem(string) Item
 	GetItems() map[string]Item
+	GetItemAt(Vector) Item
 }
 
 // This is the first (and the most important) item.
@@ -77,8 +94,10 @@ type Container interface {
 type BaseContainer struct {
 	Position Vector
 	Size     Vector
-	BGcolor  uint32
-	Items    map[string]Item
+	Events   map[string]string
+
+	BGcolor uint32
+	Items   map[string]Item
 }
 
 // Move the item to a pixel position
@@ -126,7 +145,7 @@ func (cont *BaseContainer) Draw(surf *sdl.Surface) (err error) {
 
 		// draw the item surface onto the container surface
 		src_rect := sdl.Rect{X: 0, Y: 0, W: size.X, H: size.Y}
-		dst_rect := sdl.Rect{X: pos.X, Y: pos.Y, W: pos.X + size.X, H: pos.Y + size.Y}
+		dst_rect := sdl.Rect{X: pos.X, Y: pos.Y, W: size.X, H: size.Y}
 		isurface.Blit(&src_rect, surf, &dst_rect)
 
 		isurface.Free()
@@ -150,6 +169,24 @@ func (cont *BaseContainer) GetItems() map[string]Item {
 	return cont.Items
 }
 
+// Gets you the item at position pos
+func (cont *BaseContainer) GetItemAt(pos Vector) Item {
+	for _, item := range cont.Items {
+		position := item.GetPosition()
+		size := item.GetSize()
+
+		// Check if pos is inside item
+		if position.X <= pos.X && position.Y <= pos.Y {
+			if (position.X+size.X) > pos.X && (position.Y+size.Y) > pos.Y {
+				return item
+			}
+		}
+	}
+
+	// if nothing was found, the area must be the container itself
+	return cont
+}
+
 // Getters and setters
 
 func (cont *BaseContainer) GetPosition() (position Vector) {
@@ -166,6 +203,14 @@ func (cont *BaseContainer) GetSize() (size Vector) {
 
 func (cont *BaseContainer) SetSize(size Vector) {
 	cont.Size = size
+}
+
+func (cont *BaseContainer) GetEvent(event string) (f string) {
+	return cont.Events[event]
+}
+
+func (cont *BaseContainer) GetEvents() map[string]string {
+	return cont.Events
 }
 
 /*
@@ -192,8 +237,10 @@ type ItemEntry struct {
 type ListContainer struct {
 	Position Vector
 	Size     Vector
-	BGcolor  uint32
-	Items    map[string]ItemEntry
+	Events   map[string]string
+
+	BGcolor uint32
+	Items   map[string]ItemEntry
 }
 
 // Move the item to a pixel position
@@ -218,6 +265,17 @@ func (cont *ListContainer) ResizeItemToFraction(item string, size FractionVector
 	cont.Items[item].Item.SetSize(Vector{int32(size.X * float32(cont.Size.X)), int32(size.Y * float32(cont.Size.Y))})
 }
 
+func (cont *ListContainer) getSortedItems() (items []Item) {
+	items = make([]Item, len(cont.Items))
+
+	// Put items in correct order
+	for _, val := range cont.Items {
+		items[val.Index] = val.Item
+	}
+
+	return
+}
+
 // draw a listcontainer
 // The container will let each item draw onto its own surface and then draw that onto the main surface
 // in a listcontainer all items are drawn below each other with item pos y as offset
@@ -225,15 +283,8 @@ func (cont *ListContainer) Draw(surf *sdl.Surface) (err error) {
 
 	yoffset := int32(0)
 
-	items := make([]Item, len(cont.Items))
-
-	// Put items in correct order
-	for _, val := range cont.Items {
-		items[val.Index] = val.Item
-	}
-
 	// let each item draw onto the surface
-	for _, item := range items {
+	for _, item := range cont.getSortedItems() {
 		pos := item.GetPosition()
 		size := item.GetSize()
 
@@ -258,7 +309,7 @@ func (cont *ListContainer) Draw(surf *sdl.Surface) (err error) {
 
 		// draw the item surface onto the container surface
 		src_rect := sdl.Rect{X: 0, Y: 0, W: size.X, H: size.Y}
-		dst_rect := sdl.Rect{X: pos.X, Y: pos.Y + yoffset, W: pos.X + size.X, H: pos.Y + size.Y}
+		dst_rect := sdl.Rect{X: pos.X, Y: pos.Y + yoffset, W: size.X, H: size.Y}
 		isurface.Blit(&src_rect, surf, &dst_rect)
 
 		isurface.Free()
@@ -288,6 +339,28 @@ func (cont *ListContainer) GetItems() (items map[string]Item) {
 	return
 }
 
+// Gets you the item at position pos
+func (cont *ListContainer) GetItemAt(pos Vector) Item {
+	var yoffset int32 = 0
+
+	for _, item := range cont.getSortedItems() {
+		position := item.GetPosition()
+		size := item.GetSize()
+
+		// Check if pos is inside item
+		if position.X <= pos.X && position.Y+yoffset <= pos.Y {
+			if (position.X+size.X) > pos.X && (position.Y+size.Y+yoffset) > pos.Y {
+				return item
+			}
+		}
+
+		yoffset += position.Y + size.Y
+	}
+
+	// if nothing was found, the area must be the container itself
+	return cont
+}
+
 // Getters and setters
 
 func (cont *ListContainer) GetPosition() (position Vector) {
@@ -306,6 +379,14 @@ func (cont *ListContainer) SetSize(size Vector) {
 	cont.Size = size
 }
 
+func (cont *ListContainer) GetEvent(event string) (f string) {
+	return cont.Events[event]
+}
+
+func (cont *ListContainer) GetEvents() map[string]string {
+	return cont.Events
+}
+
 /*
 ########################
 # Subsection: Label
@@ -315,6 +396,8 @@ func (cont *ListContainer) SetSize(size Vector) {
 type Label struct {
 	Position Vector
 	Size     Vector
+	Events   map[string]string
+
 	Text     string
 	Textsize int
 	Valign   Align
@@ -400,6 +483,14 @@ func (label *Label) SetSize(newsize Vector) {
 	label.Size = newsize
 }
 
+func (label *Label) GetEvent(event string) (f string) {
+	return label.Events[event]
+}
+
+func (label *Label) GetEvents() map[string]string {
+	return label.Events
+}
+
 /*
 ########################
 # Subsection: Texture
@@ -409,7 +500,9 @@ func (label *Label) SetSize(newsize Vector) {
 type Texture struct {
 	Position Vector
 	Size     Vector
-	Texture  *sdl.Surface
+	Events   map[string]string
+
+	Texture *sdl.Surface
 }
 
 // Draw the item onto the parent surface
@@ -439,6 +532,14 @@ func (tex *Texture) SetSize(size Vector) {
 	tex.Size = size
 }
 
+func (tex *Texture) GetEvent(event string) (f string) {
+	return tex.Events[event]
+}
+
+func (tex *Texture) GetEvents() map[string]string {
+	return tex.Events
+}
+
 /*
 ########################
 # Subsection: Unicolor
@@ -448,7 +549,9 @@ func (tex *Texture) SetSize(size Vector) {
 type Unicolor struct {
 	Position Vector
 	Size     Vector
-	Color    uint32
+	Events   map[string]string
+
+	Color uint32
 }
 
 // Draw the item onto the parent surface
@@ -473,4 +576,12 @@ func (unic *Unicolor) GetSize() (size Vector) {
 
 func (unic *Unicolor) SetSize(size Vector) {
 	unic.Size = size
+}
+
+func (unic *Unicolor) GetEvent(event string) (f string) {
+	return unic.Events[event]
+}
+
+func (unic *Unicolor) GetEvents() map[string]string {
+	return unic.Events
 }

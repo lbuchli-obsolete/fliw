@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/phoenixdevelops/fliw/data"
+	"github.com/phoenixdevelops/fliw/input"
 	"github.com/phoenixdevelops/fliw/parser"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -18,6 +19,8 @@ launches your app using your apps root directory.
 # Section: Launcher
 ##############################################################
 */
+
+var plugin *parser.Plugin
 
 type Initializer interface {
 	Initialize(*data.BaseContainer, *bool)
@@ -57,7 +60,7 @@ func ShowWindow(path string) (err error) {
 	// these steps are fatal:
 	// if an error occurs, the program can't continue
 
-	plugin, err := parser.OpenPluginFile(path + "/app.so")
+	plugin, err = parser.OpenPluginFile(path + "/app.so")
 	if err != nil {
 		return
 	}
@@ -175,6 +178,7 @@ func createWindow(handler WindowHandler, xmlwindow *parser.XMLWindow, windowtype
 				running = false
 				break
 			default:
+				handleEvent(cont, event)
 				handler.handleEvent(event)
 			}
 		}
@@ -191,6 +195,66 @@ func createWindow(handler WindowHandler, xmlwindow *parser.XMLWindow, windowtype
 	}
 
 	return
+}
+
+var isMouseClicked bool = false
+
+// routes events to items
+func handleEvent(maincont *data.BaseContainer, event sdl.Event) {
+	switch t := event.(type) {
+	case *sdl.MouseButtonEvent:
+		if t.Button == sdl.BUTTON_LEFT && !isMouseClicked {
+			callEventFunction(maincont, data.Vector{X: t.X, Y: t.Y}, "mouseclick")
+			isMouseClicked = true
+		} else if t.Button == sdl.BUTTON_RIGHT && !isMouseClicked {
+			callEventFunction(maincont, data.Vector{X: t.X, Y: t.Y}, "mouserightclick")
+			isMouseClicked = true
+		} else if isMouseClicked {
+			callEventFunction(maincont, data.Vector{X: t.X, Y: t.Y}, "mouserelease")
+		}
+	case *sdl.KeyboardEvent:
+		if t.GetType() == sdl.KEYDOWN {
+			input.PressKey(t.Keysym.Sym)
+			x, y, _ := sdl.GetMouseState()
+			callEventFunction(maincont, data.Vector{X: x, Y: y}, "keydown")
+		} else if t.GetType() == sdl.KEYUP {
+			input.ReleaseKey(t.Keysym.Sym)
+			x, y, _ := sdl.GetMouseState()
+			callEventFunction(maincont, data.Vector{X: x, Y: y}, "keyup")
+		}
+	}
+}
+
+// calls an event function given the curser position, the main container and the event name
+func callEventFunction(container data.Container, itempos data.Vector, eventname string) {
+	// the main container gets all events
+	if ev := container.GetEvent(eventname); ev != "" {
+		plugin.CallFunction(ev)
+	}
+
+	for true {
+		item := container.GetItemAt(itempos)
+
+		// if the item is of type container
+		if val, ok := item.(data.Container); ok {
+			// if they are the same
+			if val == container {
+				if ev := item.GetEvent(eventname); ev != "" {
+					plugin.CallFunction(ev)
+				}
+				return
+			} else {
+				container = val
+				itempos.X -= item.GetPosition().X
+				itempos.Y -= item.GetPosition().Y
+			}
+		} else {
+			if ev := item.GetEvent(eventname); ev != "" {
+				plugin.CallFunction(ev)
+			}
+			return
+		}
+	}
 }
 
 /*
