@@ -30,8 +30,8 @@
 <xs:complexType name="Item">
 	<xs:attribute name="x" />
 	<xs:attribute name="y" />
-	<xs:attribute name="width" use="required" />
-	<xs:attribute name="height" use="required" />
+	<xs:attribute name="width" />
+	<xs:attribute name="height" />
 </xs:complexType>
 
 <xs:complexType name="Container">

@@ -210,7 +210,7 @@ func validateXMLFile(file []byte) (valid bool, err error) {
 // converts XMLContainer to data.Container
 func (cont XMLBaseContainer) parse(psize data.Vector) (container *data.BaseContainer) {
 	// get the size
-	size := parseXY(cont.Width, cont.Height, psize)
+	size := parseWH(cont.Width, cont.Height, psize)
 
 	// the map of items any data.Container contains
 	itemmap := make(map[string]data.Item)
@@ -243,7 +243,7 @@ func (cont XMLBaseContainer) parse(psize data.Vector) (container *data.BaseConta
 
 func (cont XMLListContainer) parse(psize data.Vector) (listcontainer *data.ListContainer) {
 	// get the size
-	size := parseXY(cont.Width, cont.Height, psize)
+	size := parseWH(cont.Width, cont.Height, psize)
 
 	// the map of items any data.Container contains
 	itemmap := make(map[string]data.ItemEntry)
@@ -286,7 +286,7 @@ func (uni XMLUnicolor) parse(psize data.Vector) (unicolor *data.Unicolor) {
 	// Construct Unicolor
 	return &data.Unicolor{
 		Position: parseXY(uni.X, uni.Y, psize),
-		Size:     parseXY(uni.Width, uni.Height, psize),
+		Size:     parseWH(uni.Width, uni.Height, psize),
 		Color:    parseColor(uni.Color),
 	}
 }
@@ -296,7 +296,7 @@ func (label XMLLabel) parse(psize data.Vector) (l *data.Label) {
 	// Construct Label
 	return &data.Label{
 		Position: parseXY(label.X, label.Y, psize),
-		Size:     parseXY(label.Width, label.Height, psize),
+		Size:     parseWH(label.Width, label.Height, psize),
 		Text:     parseText(label.Text),
 		Textsize: parseInt(label.TextSize),
 		Valign:   parseAlign(label.VAlign),
@@ -312,7 +312,7 @@ func (tex XMLTexture) parse(psize data.Vector) (texture *data.Texture) {
 	// Construct Texture
 	return &data.Texture{
 		Position: parseXY(tex.X, tex.Y, psize),
-		Size:     parseXY(tex.Width, tex.Height, psize),
+		Size:     parseWH(tex.Width, tex.Height, psize),
 		Texture:  parseImage(tex.Texture, parseXY(tex.Width, tex.Height, psize), parseBool(tex.ScaleDown)),
 	}
 }
@@ -407,7 +407,8 @@ func parseAlign(align string) (result data.Align) {
 	}
 }
 
-// parses x and y strings to a data.Vector size / position. Defaults to 0 if string is empty.
+// parses x and y strings to a data.Vector position. Defaults to 0 if string is empty.
+// for width and height use parseWH.
 // Uses parentSize for percentual interpretation
 func parseXY(x string, y string, parentSize data.Vector) (result data.Vector) {
 	x = cleanString(x)
@@ -449,6 +450,20 @@ func parseXY(x string, y string, parentSize data.Vector) (result data.Vector) {
 	yi := strparse(y, parentSize.Y)
 
 	return data.Vector{X: xi, Y: yi}
+}
+
+// same as parseXY, except it defaults to 100%
+func parseWH(w string, h string, parentSize data.Vector) (result data.Vector) {
+	result = parseXY(w, h, parentSize)
+
+	if result.X == 0 {
+		result.X = parentSize.X
+	}
+	if result.Y == 0 {
+		result.Y = parentSize.Y
+	}
+
+	return
 }
 
 // parses a string to an int. Defaults to 0 if empty
