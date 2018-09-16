@@ -165,6 +165,7 @@ func UnmarshalXMLFile(path string, p *Plugin) (window XMLWindow, windowtype uint
 
 // get a drawable data.Container from an XMLWIndow
 func (win *XMLWindow) Parse() (maincont *data.BaseContainer) {
+	bgcolor = parseColor(win.Color)
 	return win.parse(data.Vector{X: bounds.W, Y: bounds.H})
 }
 

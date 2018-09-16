@@ -105,9 +105,6 @@ func (cont *BaseContainer) ResizeItemToFraction(item string, size FractionVector
 // The container will let each item draw onto its own surface and then draw that onto the main surface
 func (cont *BaseContainer) Draw(surf *sdl.Surface) (err error) {
 
-	// Draw background color
-	surf.FillRect(nil, cont.BGcolor)
-
 	// let each item draw onto the surface
 	for _, val := range cont.Items {
 		isurface, err := sdl.CreateRGBSurface(0, val.GetSize().X, val.GetSize().Y, 32, 0, 0, 0, 0)
