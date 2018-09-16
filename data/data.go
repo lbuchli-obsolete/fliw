@@ -4,7 +4,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 
-	"github.com/phoenixdevelops/fliw/io/imgtools"
+	"github.com/phoenixdevelops/fliw/imgtools"
 )
 
 /*

@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/phoenixdevelops/fliw/data"
-	"github.com/phoenixdevelops/fliw/io/imgtools"
+	"github.com/phoenixdevelops/fliw/imgtools"
 	xsdvalidate "github.com/terminalstatic/go-xsd-validate"
 	"github.com/veandco/go-sdl2/sdl"
 )
