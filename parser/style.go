@@ -108,11 +108,9 @@ type XMLUnicolor struct {
 
 var bgcolor uint32
 var bounds sdl.Rect
-var plug *Plugin
 
 // gives back a XMLWIndow object which can be parsed further
-func UnmarshalXMLFile(path string, p *Plugin) (window XMLWindow, windowtype uint32, err error) {
-	plug = p
+func UnmarshalXMLFile(path string) (window XMLWindow, windowtype uint32, err error) {
 
 	// open the file
 	file, err := ioutil.ReadFile(path)
