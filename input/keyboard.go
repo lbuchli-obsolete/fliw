@@ -6,10 +6,13 @@ type Key struct{}
 
 var pressedKeys map[string]Key = make(map[string]Key)
 
+var lastPressedKey string
+
 func PressKey(keycode sdl.Keycode) {
 	char := string(int(keycode))
 
 	pressedKeys[char] = Key{}
+	lastPressedKey = char
 }
 
 func ReleaseKey(keycode sdl.Keycode) {
@@ -24,4 +27,8 @@ func GetPressedKeys() (keys []string) {
 	}
 
 	return
+}
+
+func GetLastPressedKey() (key string) {
+	return lastPressedKey
 }

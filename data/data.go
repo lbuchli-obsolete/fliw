@@ -11,8 +11,6 @@ import (
 This is where all basic data types and their methods are.
 */
 
-// TODO change all struct variables to uppercase
-
 /*
 ##############################################################
 # Section: Basic Types and functions
@@ -38,16 +36,6 @@ const (
 	CENTER Align = 1
 	RIGHT  Align = 2
 	BOTTOM Align = 2
-)
-
-// text sizes
-const (
-	TITLE     int = 128
-	SUBTITLE  int = 64
-	HEADER    int = 32
-	SUBHEADER int = 24
-	TEXT      int = 16
-	SUBTEXT   int = 14
 )
 
 // unused function that will fail to compile
@@ -410,6 +398,11 @@ type Label struct {
 // Draw the item onto the parent surface
 func (label *Label) Draw(surf *sdl.Surface) (err error) {
 
+	// Color the background surface
+	// convert to sdl color and back in order to make sure the color
+	// is sdl compatible (no bytes flipped)
+	surf.FillRect(nil, imgtools.UInt32ToColor(label.BGcolor).Uint32())
+
 	var font *ttf.Font
 
 	// load font
@@ -423,46 +416,46 @@ func (label *Label) Draw(surf *sdl.Surface) (err error) {
 	}
 	defer font.Close()
 
-	// Render text to surface
-	text_surface, err := font.RenderUTF8Shaded(label.Text, imgtools.UInt32ToColor(label.Color), imgtools.UInt32ToColor(label.BGcolor))
-	if err != nil {
-		return err
+	// if text is not empty
+	if label.Text != "" {
+
+		// Render text to surface
+		text_surface, err := font.RenderUTF8Shaded(label.Text, imgtools.UInt32ToColor(label.Color), imgtools.UInt32ToColor(label.BGcolor))
+		if err != nil {
+			return err
+		}
+		defer text_surface.Free()
+
+		// Calculate vertical and horizontal position on surface
+		var coordinate_x int32
+		var coordinate_y int32
+
+		switch label.Halign {
+		case LEFT:
+			coordinate_x = 0
+		case CENTER:
+			coordinate_x = (int32(label.Size.X) - text_surface.W) / 2
+		case RIGHT:
+			coordinate_x = int32(label.Size.X) - text_surface.W
+		}
+
+		switch label.Valign {
+		case TOP:
+			coordinate_y = 0
+		case CENTER:
+			coordinate_y = (int32(label.Size.Y) - text_surface.H) / 2
+		case BOTTOM:
+			coordinate_y = int32(label.Size.Y) - text_surface.H
+		}
+
+		dst_rect := sdl.Rect{X: coordinate_x, Y: coordinate_y, W: coordinate_x + text_surface.W, H: coordinate_y + text_surface.H}
+
+		// Draw onto final surface (Text aligned)
+		text_surface.Blit(&sdl.Rect{X: 0, Y: 0, W: text_surface.W, H: text_surface.H}, surf, &dst_rect)
+
 	}
-	defer text_surface.Free()
 
-	// Calculate vertical and horizontal position on surface
-	var coordinate_x int32
-	var coordinate_y int32
-
-	switch label.Halign {
-	case LEFT:
-		coordinate_x = 0
-	case CENTER:
-		coordinate_x = (int32(label.Size.X) - text_surface.W) / 2
-	case RIGHT:
-		coordinate_x = int32(label.Size.X) - text_surface.W
-	}
-
-	switch label.Valign {
-	case TOP:
-		coordinate_y = 0
-	case CENTER:
-		coordinate_y = (int32(label.Size.Y) - text_surface.H) / 2
-	case BOTTOM:
-		coordinate_y = int32(label.Size.Y) - text_surface.H
-	}
-
-	dst_rect := sdl.Rect{X: coordinate_x, Y: coordinate_y, W: coordinate_x + text_surface.W, H: coordinate_y + text_surface.H}
-
-	// Color the background surface
-	// convert to sdl color and back in order to make sure the color
-	// is sdl compatible (no bytes flipped)
-	surf.FillRect(nil, imgtools.UInt32ToColor(label.BGcolor).Uint32())
-
-	// Draw onto final surface (Text aligned)
-	text_surface.Blit(&sdl.Rect{X: 0, Y: 0, W: text_surface.W, H: text_surface.H}, surf, &dst_rect)
-
-	return nil
+	return
 }
 
 // Getters and setters

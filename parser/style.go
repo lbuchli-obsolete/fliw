@@ -179,11 +179,13 @@ func validateXMLFile(file []byte) (valid bool, err error) {
 	if err != nil {
 		switch err.(type) {
 		case xsdvalidate.ValidationError:
+			// there was an error in the file, not our fault
 			log.Println(err)
 			log.Printf("Error in line: %d\n", err.(xsdvalidate.ValidationError).Errors[0].Line)
 			log.Println(err.(xsdvalidate.ValidationError).Errors[0].Message)
 			return false, nil
 		default:
+			// our fault?
 			return true, err
 		}
 	}
@@ -412,6 +414,8 @@ func parseXY(x string, y string, parentSize data.Vector) (result data.Vector) {
 	// preprocess
 	x = plug.PreParseString(x)
 	y = plug.PreParseString(y)
+	x = preparseNumberString(x)
+	y = preparseNumberString(y)
 
 	// function for parsing 1 dimension
 	strparse := func(v string, pv int32) (res int32) {
@@ -464,6 +468,8 @@ func parseWH(w string, h string, parentSize data.Vector) (result data.Vector) {
 // parses a string to an int. Defaults to 0 if empty
 func parseInt(integer string) (result int) {
 	integer = cleanString(integer)
+
+	integer = preparseNumberString(integer)
 
 	// preprocess
 	integer = plug.PreParseString(integer)
@@ -585,13 +591,31 @@ func cleanString(s string) (cleaned string) {
 	}
 
 	// remove whitespaces before
-	for strings.ContainsAny("\a\f\t\n\r\v", string(s[0])) {
+	for strings.ContainsAny(string(s[0]), "\a\f\t\n\r\v") {
 		s = s[1:]
 	}
 
 	// remove whitespaces after
-	for strings.ContainsAny("\a\f\t\n\r\v", string(s[len(s)-1])) {
+	for strings.ContainsAny(string(s[len(s)-1]), "\a\f\t\n\r\v") {
 		s = s[:len(s)-1]
+	}
+
+	return s
+}
+
+// preparses a string containing numbers or operations
+// if there is something to be calculated, e.g. 3*2.5
+// it will be done here
+func preparseNumberString(s string) (result string) {
+	// if the string is empty, give back an empty string
+	if s == "" {
+		return ""
+	}
+
+	// if there are any operands in the string
+	// or the string starts with brackets
+	if strings.ContainsAny(s, "+-*/^") || string(s[0]) == "(" {
+		return CalculateValue(s)
 	}
 
 	return s

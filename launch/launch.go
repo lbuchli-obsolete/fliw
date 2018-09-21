@@ -65,7 +65,10 @@ func ShowWindow(path string) (err error) {
 		return
 	}
 
-	window, windowtype, err := parser.UnmarshalXMLFile(path+"/style.xml", plugin)
+	// initialize the parser package
+	parser.Init(plugin)
+
+	window, windowtype, err := parser.UnmarshalXMLFile(path + "/style.xml")
 	if err != nil {
 		return
 	}
@@ -204,12 +207,13 @@ func handleEvent(maincont *data.BaseContainer, event sdl.Event) {
 	switch t := event.(type) {
 	case *sdl.MouseButtonEvent:
 		if t.Button == sdl.BUTTON_LEFT && !isMouseClicked {
+			isMouseClicked = true
 			callEventFunction(maincont, data.Vector{X: t.X, Y: t.Y}, "mouseclick")
-			isMouseClicked = true
 		} else if t.Button == sdl.BUTTON_RIGHT && !isMouseClicked {
-			callEventFunction(maincont, data.Vector{X: t.X, Y: t.Y}, "mouserightclick")
 			isMouseClicked = true
+			callEventFunction(maincont, data.Vector{X: t.X, Y: t.Y}, "mouserightclick")
 		} else if isMouseClicked {
+			isMouseClicked = false
 			callEventFunction(maincont, data.Vector{X: t.X, Y: t.Y}, "mouserelease")
 		}
 	case *sdl.KeyboardEvent:
