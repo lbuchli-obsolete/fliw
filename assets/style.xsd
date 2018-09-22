@@ -43,6 +43,8 @@
 					minOccurs="0" maxOccurs="unbounded" />
 				<xs:element name="listcontainer" type="Listcontainer"
 					minOccurs="0" maxOccurs="unbounded" />
+				<xs:element name="link" type="Link"
+					minOccurs="0" maxOccurs="unbounded" />
 				<xs:element name="label" type="Label"
 					minOccurs="0" maxOccurs="unbounded" />
 				<xs:element name="texture" type="Texture"
@@ -58,6 +60,13 @@
 <xs:complexType name="Listcontainer">
 	<xs:complexContent>
 		<xs:extension base="Container">
+		</xs:extension>
+	</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Link" mixed="true" >
+	<xs:complexContent>
+		<xs:extension base="Item">
 		</xs:extension>
 	</xs:complexContent>
 </xs:complexType>

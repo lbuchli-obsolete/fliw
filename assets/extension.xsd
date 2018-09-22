@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+<xs:complexType name="Item">
+	<xs:attribute name="x" default="0" />
+	<xs:attribute name="y" default="0" />
+	<xs:attribute name="width" default="100%" />
+	<xs:attribute name="height" default="100%" />
+	<xs:attribute name="onevent" />
+</xs:complexType>
+
+<xs:complexType name="Container">
+	<xs:complexContent>
+		<xs:extension base="Item">
+			<xs:choice maxOccurs="unbounded">
+				<xs:element name="container" type="Container"
+					minOccurs="0" maxOccurs="unbounded" />
+				<xs:element name="listcontainer" type="Listcontainer"
+					minOccurs="0" maxOccurs="unbounded" />
+				<xs:element name="link" type="Link"
+					minOccurs="0" maxOccurs="unbounded" />
+				<xs:element name="label" type="Label"
+					minOccurs="0" maxOccurs="unbounded" />
+				<xs:element name="texture" type="Texture"
+					minOccurs="0" maxOccurs="unbounded" />
+				<xs:element name="unicolor" type="Unicolor"
+					minOccurs="0" maxOccurs="unbounded" />
+			</xs:choice>
+			<xs:attribute name="color" default="#000000" />
+		</xs:extension>
+	</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Listcontainer">
+	<xs:complexContent>
+		<xs:extension base="Container">
+		</xs:extension>
+	</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Link" mixed="true" >
+	<xs:complexContent>
+		<xs:extension base="Item">
+		</xs:extension>
+	</xs:complexContent>
+</xs:complexType>
+
+<xs:simpleType name="Valign">
+	<xs:restriction base="xs:string">
+		<xs:enumeration value="top" />
+		<xs:enumeration value="center" />
+		<xs:enumeration value="bottom" />
+	</xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="Halign">
+	<xs:restriction base="xs:string">
+		<xs:enumeration value="left" />
+		<xs:enumeration value="center" />
+		<xs:enumeration value="right" />
+	</xs:restriction>
+</xs:simpleType>
+
+<xs:complexType name="Label" mixed="true" >
+	<xs:complexContent>
+		<xs:extension base="Item">
+			<xs:attribute name="textsize" use="required" />
+			<xs:attribute name="valign" type="Valign" default="center" />
+			<xs:attribute name="halign" type="Halign" default="center" />
+			<xs:attribute name="fgcolor" use="required" />
+			<xs:attribute name="bgcolor"/>
+			<xs:attribute name="bold" default="false" />
+		</xs:extension>
+	</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Texture" mixed="true" >
+	<xs:complexContent>
+		<xs:extension base="Item">
+			<xs:attribute name="scaledown" default="false" />
+		</xs:extension>
+	</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Unicolor" mixed="true" >
+	<xs:complexContent>
+		<xs:extension base="Item">
+		</xs:extension>
+	</xs:complexContent>
+</xs:complexType>
+
+<xs:element name="extension">
+	<xs:complexType>
+		<xs:complexContent>
+			<xs:extension base="Container">
+				<xs:attribute name="backend" use="required" />
+			</xs:extension>
+		</xs:complexContent>
+	</xs:complexType>
+</xs:element>
+
+</xs:schema>
