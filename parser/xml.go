@@ -357,33 +357,50 @@ func (tex XMLTexture) parse(psize data.Vector, plugin string) (texture *data.Tex
 	}
 }
 
+var links = make(map[string]*XMLExtension)
+
 func (link XMLLink) parse(psize data.Vector, plugin string) (cont *data.BaseContainer) {
 	filepath := parsePath(link.Link, plugin)
 
-	// read the extension file
-	file, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
+	ext, ok := links[filepath]
+	var newplug string
+	// if extension wasn't read already
+	if !ok {
+		// read the extension file
+		file, err := ioutil.ReadFile(filepath)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
 
-	// validate the extension file
-	valid, err := validateXMLFile(file, "assets/extension.xsd")
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	if !valid {
-		log.Fatal("XML extension file ", filepath, " is not valid.")
-		return
-	}
+		// validate the extension file
+		valid, err := validateXMLFile(file, "assets/extension.xsd")
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		if !valid {
+			log.Fatal("XML extension file ", filepath, " is not valid.")
+			return
+		}
 
-	// unmarshal the extension file
-	ext := XMLExtension{}
-	err = xml.Unmarshal(file, &ext)
-	if err != nil {
-		log.Fatal(err)
-		return
+		// unmarshal the extension file
+		ext = &XMLExtension{}
+		err = xml.Unmarshal(file, ext)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+
+		// save work for later
+		links[filepath] = ext
+
+		newplug = parsePath(ext.Backend, plugin)
+
+		// register backend
+		backend.AddPlugin(newplug)
+	} else {
+		newplug = parsePath(ext.Backend, plugin)
 	}
 
 	// needs to be set so child elements can
@@ -391,7 +408,7 @@ func (link XMLLink) parse(psize data.Vector, plugin string) (cont *data.BaseCont
 	ext.XMLBaseContainer.Width = link.Width
 	ext.XMLBaseContainer.Height = link.Height
 
-	cont = ext.XMLBaseContainer.parse(psize, parsePath(ext.Backend, plugin))
+	cont = ext.XMLBaseContainer.parse(psize, newplug)
 
 	// overwrite x, y, width, height
 	cont.Position = parseXY(link.X, link.Y, psize, plugin)
