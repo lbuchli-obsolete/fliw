@@ -46,14 +46,50 @@ var WindowType = map[string]uint32{
 	"vulkan":             sdl.WINDOW_VULKAN,
 }
 
+// XMLItem is an interface for an XML item.
+// It must be parsable to its data.Item equivalent
+type XMLItem interface {
+	parse(data.Vector, string) data.Item
+	isStatic(string) bool
+	getUID() uint
+}
+
+// XMLContainer is an extension to the XML item interface
+// allowing a parseToCont function
+type XMLContainer interface {
+	XMLItem
+	parseToCont(data.Vector, string) data.Container
+}
+
 // XMLItem is the base of all XML elements
 // it defines basic things like position, size and events
-type XMLItem struct {
+type XMLBase struct {
+	UID     uint
 	X       string `xml:"x,attr"`
 	Y       string `xml:"y,attr"`
 	Width   string `xml:"width,attr"`
 	Height  string `xml:"height,attr"`
 	OnEvent string `xml:"onevent,attr"`
+	Static  string `xml:"static,attr"`
+}
+
+type XMLContainerBase struct {
+	XMLBase
+	Color     string             `xml:"color,attr"`
+	Conts     []XMLBaseContainer `xml:"container"`
+	ListConts []XMLListContainer `xml:"listcontainer"`
+	Labels    []XMLLabel         `xml:"label"`
+	Textures  []XMLTexture       `xml:"texture"`
+	Unicolors []XMLUnicolor      `xml:"unicolor"`
+	Links     []XMLLink          `xml:"link"`
+}
+
+func (base XMLBase) isStatic(plugin string) bool {
+	return parseBool(base.Static, plugin)
+}
+
+func (base XMLBase) getUID() uint {
+	return base.UID
 }
 
 // XMLWindow is the base XML element of each
@@ -75,27 +111,20 @@ type XMLExtension struct {
 // XMLBaseContainer is an item that holds other items.
 type XMLBaseContainer struct {
 	XMLName xml.Name `xml:"container"`
-	XMLItem
-	Color     string             `xml:"color,attr"`
-	Conts     []XMLBaseContainer `xml:"container"`
-	ListConts []XMLListContainer `xml:"listcontainer"`
-	Labels    []XMLLabel         `xml:"label"`
-	Textures  []XMLTexture       `xml:"texture"`
-	Unicolors []XMLUnicolor      `xml:"unicolor"`
-	Links     []XMLLink          `xml:"link"`
+	XMLContainerBase
 }
 
 // XMLListContainer is a XMLBaseContainer but it stacks
 // the items ontop of each other when being drawn
 type XMLListContainer struct {
 	XMLName xml.Name `xml:"listcontainer"`
-	XMLBaseContainer
+	XMLContainerBase
 }
 
 // XMLLabel is an item displaying basic short text
 type XMLLabel struct {
 	XMLName xml.Name `xml:"label"`
-	XMLItem
+	XMLBase
 	TextSize string `xml:"textsize,attr"`
 	VAlign   string `xml:"valign,attr"`
 	HAlign   string `xml:"halign,attr"`
@@ -108,7 +137,7 @@ type XMLLabel struct {
 // XMLTexture is an item displaying a texture (picture)
 type XMLTexture struct {
 	XMLName xml.Name `xml:"texture"`
-	XMLItem
+	XMLBase
 	Texture   string `xml:",chardata"`
 	ScaleDown string `xml:"scaledown,attr"`
 }
@@ -116,7 +145,7 @@ type XMLTexture struct {
 // XMLUnicolor is an item displaying only a single color
 type XMLUnicolor struct {
 	XMLName xml.Name `xml:"unicolor"`
-	XMLItem
+	XMLBase
 	Color string `xml:",chardata"`
 }
 
@@ -124,11 +153,8 @@ type XMLUnicolor struct {
 // It has no data counterpart
 type XMLLink struct {
 	XMLName xml.Name `xml:"link"`
-	X       string   `xml:"x,attr"`
-	Y       string   `xml:"y,attr"`
-	Width   string   `xml:"width,attr"`
-	Height  string   `xml:"height,attr"`
-	Link    string   `xml:",chardata"`
+	XMLBase
+	Link string `xml:",chardata"`
 }
 
 /*
@@ -141,9 +167,14 @@ var bgcolor uint32
 var bounds sdl.Rect
 var dirpath string
 
+var staticItems map[uint]*data.Item
+
+var uidIndex uint
+
 // UnmarshalXMLFile gives back a XMLWIndow object which can be parsed further
 func UnmarshalXMLFile(path string) (window XMLWindow, windowtype uint32, err error) {
 	dirpath = path
+	staticItems = make(map[uint]*data.Item)
 
 	// open the file
 	file, err := ioutil.ReadFile(path + "/style.xml")
@@ -171,6 +202,8 @@ func UnmarshalXMLFile(path string) (window XMLWindow, windowtype uint32, err err
 	if err != nil {
 		return
 	}
+
+	win.XMLBaseContainer.assignUIDs()
 
 	// get the display size
 	bounds, err = sdl.GetDisplayBounds(0)
@@ -220,20 +253,70 @@ func validateXMLFile(file []byte, xsdpath string) (valid bool, err error) {
 	return true, nil
 }
 
+// parse any item to its data.Item counterpart
+func parseItem(item XMLItem, psize data.Vector, plugin string) data.Item {
+	if item.isStatic(plugin) {
+		if val, ok := staticItems[item.getUID()]; ok {
+			return *val
+		} else {
+			val := item.parse(psize, plugin)
+			staticItems[item.getUID()] = &val
+			return val
+		}
+	}
+
+	return item.parse(psize, plugin)
+}
+
+// recursively assigns a UID to the container and all its children
+func (cont *XMLContainerBase) assignUIDs() {
+	// assign own uid
+	cont.UID = uidIndex
+	uidIndex++
+
+	// assign all the normal items a uid
+	for i := range cont.Labels {
+		cont.Labels[i].UID = uidIndex
+		uidIndex++
+	}
+	for i := range cont.Textures {
+		cont.Textures[i].UID = uidIndex
+		uidIndex++
+	}
+	for i := range cont.Unicolors {
+		cont.Unicolors[i].UID = uidIndex
+		uidIndex++
+	}
+	for i := range cont.Links {
+		cont.Links[i].UID = uidIndex
+		uidIndex++
+	}
+
+	// let the containers assign uids
+	for i := range cont.Conts {
+		cont.Conts[i].assignUIDs()
+		uidIndex++
+	}
+	for i := range cont.ListConts {
+		cont.ListConts[i].assignUIDs()
+		uidIndex++
+	}
+}
+
 /*
 ###########################################
 # Struct Parser
 ###########################################
 */
 
-// Parse gets a drawable data.Container from an XMLWIndow
-func (win *XMLWindow) Parse() (maincont *data.BaseContainer) {
+// Parse gets a drawable data.Container from an XMLWindow
+func (win *XMLWindow) Parse() (maincont data.Container) {
 	bgcolor = parseColor(win.Color, dirpath+"/app.so")
-	return win.parse(data.Vector{X: bounds.W, Y: bounds.H}, dirpath+"/app.so")
+	return win.parseToCont(data.Vector{X: bounds.W, Y: bounds.H}, dirpath+"/app.so")
 }
 
 // converts XMLContainer to data.Container
-func (cont XMLBaseContainer) parse(psize data.Vector, plugin string) (container *data.BaseContainer) {
+func (cont XMLBaseContainer) parseToCont(psize data.Vector, plugin string) (container data.Container) {
 	// get the size
 	size := parseWH(cont.Width, cont.Height, psize, plugin)
 
@@ -242,22 +325,22 @@ func (cont XMLBaseContainer) parse(psize data.Vector, plugin string) (container 
 
 	// Add the items to the list
 	for it, item := range cont.Labels {
-		itemmap["label"+strconv.Itoa(it)] = item.parse(size, plugin)
+		itemmap["label"+strconv.Itoa(it)] = parseItem(item, size, plugin)
 	}
 	for it, item := range cont.Textures {
-		itemmap["texture"+strconv.Itoa(it)] = item.parse(size, plugin)
+		itemmap["texture"+strconv.Itoa(it)] = parseItem(item, size, plugin)
 	}
 	for it, item := range cont.Unicolors {
-		itemmap["unicolor"+strconv.Itoa(it)] = item.parse(size, plugin)
+		itemmap["unicolor"+strconv.Itoa(it)] = parseItem(item, size, plugin)
 	}
 	for it, item := range cont.Conts {
-		itemmap["container"+strconv.Itoa(it)] = item.parse(size, plugin)
+		itemmap["container"+strconv.Itoa(it)] = parseItem(item, size, plugin)
 	}
 	for it, item := range cont.ListConts {
-		itemmap["listcontainer"+strconv.Itoa(it)] = item.parse(size, plugin)
+		itemmap["listcontainer"+strconv.Itoa(it)] = parseItem(item, size, plugin)
 	}
 	for it, item := range cont.Links {
-		itemmap["link"+strconv.Itoa(it)] = item.parse(size, plugin)
+		itemmap["link"+strconv.Itoa(it)] = parseItem(item, size, plugin)
 	}
 
 	// Construct container
@@ -271,7 +354,13 @@ func (cont XMLBaseContainer) parse(psize data.Vector, plugin string) (container 
 	}
 }
 
-func (cont XMLListContainer) parse(psize data.Vector, plugin string) (listcontainer *data.ListContainer) {
+// converts XMLContainer to data.Item
+func (cont XMLBaseContainer) parse(psize data.Vector, plugin string) (container data.Item) {
+	return cont.parseToCont(psize, plugin)
+}
+
+// converts XMLListContainer to data.Container
+func (cont XMLListContainer) parseToCont(psize data.Vector, plugin string) (listcontainer data.Container) {
 	// get the size
 	size := parseWH(cont.Width, cont.Height, psize, plugin)
 
@@ -281,27 +370,27 @@ func (cont XMLListContainer) parse(psize data.Vector, plugin string) (listcontai
 
 	// Add the items to the list
 	for it, item := range cont.Labels {
-		itemmap["label"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size, plugin)}
+		itemmap["label"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
 		itemindex++
 	}
 	for it, item := range cont.Textures {
-		itemmap["texture"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size, plugin)}
+		itemmap["texture"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
 		itemindex++
 	}
 	for it, item := range cont.Unicolors {
-		itemmap["unicolor"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size, plugin)}
+		itemmap["unicolor"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
 		itemindex++
 	}
 	for it, item := range cont.Conts {
-		itemmap["container"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size, plugin)}
+		itemmap["container"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
 		itemindex++
 	}
 	for it, item := range cont.ListConts {
-		itemmap["listcontainer"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size, plugin)}
+		itemmap["listcontainer"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
 		itemindex++
 	}
 	for it, item := range cont.Links {
-		itemmap["link"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: item.parse(size, plugin)}
+		itemmap["link"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
 		itemindex++
 	}
 
@@ -314,11 +403,15 @@ func (cont XMLListContainer) parse(psize data.Vector, plugin string) (listcontai
 		Events:   parseEvents(cont.OnEvent, plugin),
 		IsLink:   false,
 	}
+}
 
+// converts XMLListContainer to data.Item
+func (cont XMLListContainer) parse(psize data.Vector, plugin string) (listcontainer data.Item) {
+	return cont.parseToCont(psize, plugin)
 }
 
 // converts XMLUnicolor to data.Unicolor
-func (uni XMLUnicolor) parse(psize data.Vector, plugin string) (unicolor *data.Unicolor) {
+func (uni XMLUnicolor) parse(psize data.Vector, plugin string) (unicolor data.Item) {
 	// Construct Unicolor
 	return &data.Unicolor{
 		Position: parseXY(uni.X, uni.Y, psize, plugin),
@@ -329,24 +422,24 @@ func (uni XMLUnicolor) parse(psize data.Vector, plugin string) (unicolor *data.U
 }
 
 // converts XMLLabel to data.Label
-func (label XMLLabel) parse(psize data.Vector, plugin string) (l *data.Label) {
+func (lab XMLLabel) parse(psize data.Vector, plugin string) (label data.Item) {
 	// Construct Label
 	return &data.Label{
-		Position: parseXY(label.X, label.Y, psize, plugin),
-		Size:     parseWH(label.Width, label.Height, psize, plugin),
-		Text:     parseText(label.Text, plugin),
-		Textsize: parseInt(label.TextSize, plugin),
-		Valign:   parseAlign(label.VAlign, plugin),
-		Halign:   parseAlign(label.HAlign, plugin),
-		Color:    parseColor(label.FGColor, plugin),
-		BGcolor:  parseColor(label.BGColor, plugin),
-		Bold:     parseBool(label.Bold, plugin),
-		Events:   parseEvents(label.OnEvent, plugin),
+		Position: parseXY(lab.X, lab.Y, psize, plugin),
+		Size:     parseWH(lab.Width, lab.Height, psize, plugin),
+		Text:     parseText(lab.Text, plugin),
+		Textsize: parseInt(lab.TextSize, plugin),
+		Valign:   parseAlign(lab.VAlign, plugin),
+		Halign:   parseAlign(lab.HAlign, plugin),
+		Color:    parseColor(lab.FGColor, plugin),
+		BGcolor:  parseColor(lab.BGColor, plugin),
+		Bold:     parseBool(lab.Bold, plugin),
+		Events:   parseEvents(lab.OnEvent, plugin),
 	}
 }
 
 // converts XMLTexture to data.Texture
-func (tex XMLTexture) parse(psize data.Vector, plugin string) (texture *data.Texture) {
+func (tex XMLTexture) parse(psize data.Vector, plugin string) (texture data.Item) {
 	// Construct Texture
 	return &data.Texture{
 		Position: parseXY(tex.X, tex.Y, psize, plugin),
@@ -359,7 +452,8 @@ func (tex XMLTexture) parse(psize data.Vector, plugin string) (texture *data.Tex
 
 var links = make(map[string]*XMLExtension)
 
-func (link XMLLink) parse(psize data.Vector, plugin string) (cont *data.BaseContainer) {
+// converts XMLLink to data.Container
+func (link XMLLink) parse(psize data.Vector, plugin string) (cont data.Item) {
 	filepath := parsePath(link.Link, plugin)
 
 	ext, ok := links[filepath]
@@ -392,6 +486,9 @@ func (link XMLLink) parse(psize data.Vector, plugin string) (cont *data.BaseCont
 			return
 		}
 
+		// assign uids
+		ext.XMLBaseContainer.assignUIDs()
+
 		// save work for later
 		links[filepath] = ext
 
@@ -408,16 +505,16 @@ func (link XMLLink) parse(psize data.Vector, plugin string) (cont *data.BaseCont
 	ext.XMLBaseContainer.Width = link.Width
 	ext.XMLBaseContainer.Height = link.Height
 
-	cont = ext.XMLBaseContainer.parse(psize, newplug)
+	datacont := ext.XMLBaseContainer.parseToCont(psize, newplug)
 
 	// overwrite x, y, width, height
-	cont.Position = parseXY(link.X, link.Y, psize, plugin)
-	cont.Size = parseWH(link.Width, link.Height, psize, plugin)
+	datacont.SetPosition(parseXY(link.X, link.Y, psize, plugin))
+	datacont.SetSize(parseWH(link.Width, link.Height, psize, plugin))
 
 	// make the container a link
-	cont.IsLink = true
+	datacont.SetLink(true)
 
-	return cont
+	return datacont
 }
 
 /*

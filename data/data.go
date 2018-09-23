@@ -82,6 +82,7 @@ type Container interface {
 	GetItems() map[string]Item
 	GetItemAt(Vector) Item
 	GetIsLink() bool
+	SetLink(bool)
 }
 
 // BaseContainer is the first (and the most important) item.
@@ -219,6 +220,11 @@ func (cont *BaseContainer) GetEvents() map[string]string {
 // GetIsLink tells wether this container is used as a link to another XML file
 func (cont *BaseContainer) GetIsLink() bool {
 	return cont.IsLink
+}
+
+// SetLink sets wether this is used as a link
+func (cont *BaseContainer) SetLink(isLink bool) {
+	cont.IsLink = isLink
 }
 
 /*
@@ -406,6 +412,11 @@ func (cont *ListContainer) GetEvents() map[string]string {
 // GetIsLink returns wether the container is used as a link to another XML file
 func (cont *ListContainer) GetIsLink() bool {
 	return cont.IsLink
+}
+
+// SetLink sets wether this is used as a link
+func (cont *ListContainer) SetLink(isLink bool) {
+	cont.IsLink = isLink
 }
 
 /*
