@@ -92,6 +92,51 @@ func (base XMLBase) getUID() uint {
 	return base.UID
 }
 
+// gets a list of items in the container
+func (base XMLContainerBase) getItemList(psize data.Vector, plugin string) (list []data.Item, size data.Vector) {
+	// get the size
+	size = parseWH(base.Width, base.Height, psize, plugin)
+
+	// list of data.Items
+	list = make([]data.Item,
+		len(base.Labels)+
+			len(base.Textures)+
+			len(base.Unicolors)+
+			len(base.Conts)+
+			len(base.ListConts)+
+			len(base.Links))
+
+	var index int
+
+	// Add the items to the list
+	for _, item := range base.Labels {
+		list[index] = parseItem(item, size, plugin)
+		index++
+	}
+	for _, item := range base.Textures {
+		list[index] = parseItem(item, size, plugin)
+		index++
+	}
+	for _, item := range base.Unicolors {
+		list[index] = parseItem(item, size, plugin)
+		index++
+	}
+	for _, item := range base.Conts {
+		list[index] = parseItem(item, size, plugin)
+		index++
+	}
+	for _, item := range base.ListConts {
+		list[index] = parseItem(item, size, plugin)
+		index++
+	}
+	for _, item := range base.Links {
+		list[index] = parseItem(item, size, plugin)
+		index++
+	}
+
+	return
+}
+
 // XMLWindow is the base XML element of each
 // style.xml file
 type XMLWindow struct {
@@ -317,40 +362,20 @@ func (win *XMLWindow) Parse() (maincont data.Container) {
 
 // converts XMLContainer to data.Container
 func (cont XMLBaseContainer) parseToCont(psize data.Vector, plugin string) (container data.Container) {
-	// get the size
-	size := parseWH(cont.Width, cont.Height, psize, plugin)
-
-	// the map of items any data.Container contains
-	itemmap := make(map[string]data.Item)
-
-	// Add the items to the list
-	for it, item := range cont.Labels {
-		itemmap["label"+strconv.Itoa(it)] = parseItem(item, size, plugin)
-	}
-	for it, item := range cont.Textures {
-		itemmap["texture"+strconv.Itoa(it)] = parseItem(item, size, plugin)
-	}
-	for it, item := range cont.Unicolors {
-		itemmap["unicolor"+strconv.Itoa(it)] = parseItem(item, size, plugin)
-	}
-	for it, item := range cont.Conts {
-		itemmap["container"+strconv.Itoa(it)] = parseItem(item, size, plugin)
-	}
-	for it, item := range cont.ListConts {
-		itemmap["listcontainer"+strconv.Itoa(it)] = parseItem(item, size, plugin)
-	}
-	for it, item := range cont.Links {
-		itemmap["link"+strconv.Itoa(it)] = parseItem(item, size, plugin)
-	}
+	list, size := cont.getItemList(psize, plugin)
 
 	// Construct container
 	return &data.BaseContainer{
-		Position: parseXY(cont.X, cont.Y, psize, plugin),
-		Size:     size,
-		BGcolor:  parseColor(cont.Color, plugin),
-		Items:    itemmap,
-		Events:   parseEvents(cont.OnEvent, plugin),
-		IsLink:   false,
+		ContainerBase: data.ContainerBase{
+			ItemBase: data.ItemBase{
+				Position: parseXY(cont.X, cont.Y, psize, plugin),
+				Size:     size,
+				Events:   parseEvents(cont.OnEvent, plugin),
+			},
+			BGcolor: parseColor(cont.Color, plugin),
+			Items:   list,
+			IsLink:  false,
+		},
 	}
 }
 
@@ -361,47 +386,20 @@ func (cont XMLBaseContainer) parse(psize data.Vector, plugin string) (container 
 
 // converts XMLListContainer to data.Container
 func (cont XMLListContainer) parseToCont(psize data.Vector, plugin string) (listcontainer data.Container) {
-	// get the size
-	size := parseWH(cont.Width, cont.Height, psize, plugin)
-
-	// the map of items any data.Container contains
-	itemmap := make(map[string]data.ItemEntry)
-	itemindex := 0
-
-	// Add the items to the list
-	for it, item := range cont.Labels {
-		itemmap["label"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
-		itemindex++
-	}
-	for it, item := range cont.Textures {
-		itemmap["texture"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
-		itemindex++
-	}
-	for it, item := range cont.Unicolors {
-		itemmap["unicolor"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
-		itemindex++
-	}
-	for it, item := range cont.Conts {
-		itemmap["container"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
-		itemindex++
-	}
-	for it, item := range cont.ListConts {
-		itemmap["listcontainer"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
-		itemindex++
-	}
-	for it, item := range cont.Links {
-		itemmap["link"+strconv.Itoa(it)] = data.ItemEntry{Index: itemindex, Item: parseItem(item, size, plugin)}
-		itemindex++
-	}
+	list, size := cont.getItemList(psize, plugin)
 
 	// Construct container
 	return &data.ListContainer{
-		Position: parseXY(cont.X, cont.Y, psize, plugin),
-		Size:     size,
-		BGcolor:  parseColor(cont.Color, plugin),
-		Items:    itemmap,
-		Events:   parseEvents(cont.OnEvent, plugin),
-		IsLink:   false,
+		ContainerBase: data.ContainerBase{
+			ItemBase: data.ItemBase{
+				Position: parseXY(cont.X, cont.Y, psize, plugin),
+				Size:     size,
+				Events:   parseEvents(cont.OnEvent, plugin),
+			},
+			BGcolor: parseColor(cont.Color, plugin),
+			Items:   list,
+			IsLink:  false,
+		},
 	}
 }
 
@@ -414,10 +412,12 @@ func (cont XMLListContainer) parse(psize data.Vector, plugin string) (listcontai
 func (uni XMLUnicolor) parse(psize data.Vector, plugin string) (unicolor data.Item) {
 	// Construct Unicolor
 	return &data.Unicolor{
-		Position: parseXY(uni.X, uni.Y, psize, plugin),
-		Size:     parseWH(uni.Width, uni.Height, psize, plugin),
-		Color:    parseColor(uni.Color, plugin),
-		Events:   parseEvents(uni.OnEvent, plugin),
+		ItemBase: data.ItemBase{
+			Position: parseXY(uni.X, uni.Y, psize, plugin),
+			Size:     parseWH(uni.Width, uni.Height, psize, plugin),
+			Events:   parseEvents(uni.OnEvent, plugin),
+		},
+		Color: parseColor(uni.Color, plugin),
 	}
 }
 
@@ -425,8 +425,11 @@ func (uni XMLUnicolor) parse(psize data.Vector, plugin string) (unicolor data.It
 func (lab XMLLabel) parse(psize data.Vector, plugin string) (label data.Item) {
 	// Construct Label
 	return &data.Label{
-		Position: parseXY(lab.X, lab.Y, psize, plugin),
-		Size:     parseWH(lab.Width, lab.Height, psize, plugin),
+		ItemBase: data.ItemBase{
+			Position: parseXY(lab.X, lab.Y, psize, plugin),
+			Size:     parseWH(lab.Width, lab.Height, psize, plugin),
+			Events:   parseEvents(lab.OnEvent, plugin),
+		},
 		Text:     parseText(lab.Text, plugin),
 		Textsize: parseInt(lab.TextSize, plugin),
 		Valign:   parseAlign(lab.VAlign, plugin),
@@ -434,7 +437,6 @@ func (lab XMLLabel) parse(psize data.Vector, plugin string) (label data.Item) {
 		Color:    parseColor(lab.FGColor, plugin),
 		BGcolor:  parseColor(lab.BGColor, plugin),
 		Bold:     parseBool(lab.Bold, plugin),
-		Events:   parseEvents(lab.OnEvent, plugin),
 	}
 }
 
@@ -442,11 +444,13 @@ func (lab XMLLabel) parse(psize data.Vector, plugin string) (label data.Item) {
 func (tex XMLTexture) parse(psize data.Vector, plugin string) (texture data.Item) {
 	// Construct Texture
 	return &data.Texture{
-		Position: parseXY(tex.X, tex.Y, psize, plugin),
-		Size:     parseWH(tex.Width, tex.Height, psize, plugin),
+		ItemBase: data.ItemBase{
+			Position: parseXY(tex.X, tex.Y, psize, plugin),
+			Size:     parseWH(tex.Width, tex.Height, psize, plugin),
+			Events:   parseEvents(tex.OnEvent, plugin),
+		},
 		Texture: parseImage(tex.Texture, parseXY(tex.Width, tex.Height, psize, plugin),
 			parseBool(tex.ScaleDown, plugin), plugin),
-		Events: parseEvents(tex.OnEvent, plugin),
 	}
 }
 

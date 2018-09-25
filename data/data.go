@@ -45,7 +45,7 @@ const (
 
 // unused function that will fail to compile
 // if any of the listed structs are not in the interface
-func checkSatisfaction() {
+func checkIntefraceSatisfaction() {
 	var _ Container = (*BaseContainer)(nil)
 	var _ Container = (*ListContainer)(nil)
 	var _ Item = (*Label)(nil)
@@ -61,6 +61,7 @@ func checkSatisfaction() {
 
 // Item is the base interface of all elements
 type Item interface {
+	GetUID() uint
 	Draw(*sdl.Surface) error
 	GetPosition() Vector
 	SetPosition(Vector)
@@ -73,57 +74,142 @@ type Item interface {
 // Container is an item containing other items.
 type Container interface {
 	Item
-	MoveItem(string, Vector)
-	MoveItemToFraction(string, FractionVector)
-	ResizeItem(string, Vector)
-	ResizeItemToFraction(string, FractionVector)
-	AddItem(string, Item)
-	GetItem(string) Item
-	GetItems() map[string]Item
+	MoveItem(int, Vector)
+	MoveItemToFraction(int, FractionVector)
+	ResizeItem(int, Vector)
+	ResizeItemToFraction(int, FractionVector)
+	AddItem(Item)
+	GetItem(int) Item
+	GetItems() []Item
 	GetItemAt(Vector) Item
 	GetIsLink() bool
 	SetLink(bool)
 }
 
-// BaseContainer is the first (and the most important) item.
-// It is used to group other items.
-type BaseContainer struct {
+type ItemBase struct {
+	UID      uint
 	Position Vector
 	Size     Vector
 	Events   map[string]string
+}
 
+// GetUID returns the unique identifier of the item
+func (base *ItemBase) GetUID() (uid uint) {
+	return base.UID
+}
+
+// GetPosition returns the position
+func (base *ItemBase) GetPosition() (position Vector) {
+	return base.Position
+}
+
+// SetPosition sets the position
+func (base *ItemBase) SetPosition(position Vector) {
+	base.Position = position
+}
+
+// GetSize returns the size
+func (base *ItemBase) GetSize() (size Vector) {
+	return base.Size
+}
+
+// SetSize sets the size
+func (base *ItemBase) SetSize(size Vector) {
+	base.Size = size
+}
+
+// GetEvent returns the name of the function to call
+// when event is invoked
+func (base *ItemBase) GetEvent(event string) (f string) {
+	return base.Events[event]
+}
+
+// GetEvents returns a map of all event assignments
+func (base *ItemBase) GetEvents() map[string]string {
+	return base.Events
+}
+
+// ContainerBase is the base for every container struct
+type ContainerBase struct {
+	ItemBase
 	BGcolor uint32
-	Items   map[string]Item
+	Items   []Item
 	IsLink  bool
 }
 
 // MoveItem moves the item to a pixel position
-func (cont *BaseContainer) MoveItem(item string, pos Vector) {
-	cont.Items[item].SetPosition(pos)
+func (cont *ContainerBase) MoveItem(index int, pos Vector) {
+	cont.Items[index].SetPosition(pos)
 }
 
 // MoveItemToFraction moves the item to a fraction of the parent container size
-func (cont *BaseContainer) MoveItemToFraction(item string, pos FractionVector) {
-	cont.Items[item].SetPosition(Vector{int32(pos.X * float32(cont.Size.X)), int32(pos.Y * float32(cont.Size.Y))})
+func (cont *ContainerBase) MoveItemToFraction(index int, pos FractionVector) {
+	cont.Items[index].SetPosition(Vector{int32(pos.X * float32(cont.Size.X)), int32(pos.Y * float32(cont.Size.Y))})
 }
 
 // ResizeItem resizes an Item to a specific pixel size
-func (cont *BaseContainer) ResizeItem(item string, size Vector) {
-	cont.Items[item].SetSize(size)
+func (cont *ContainerBase) ResizeItem(index int, size Vector) {
+	cont.Items[index].SetSize(size)
 }
 
 // ResizeItemToFraction resizes an Item to a fraction of the parent container size
-func (cont *BaseContainer) ResizeItemToFraction(item string, size FractionVector) {
-	cont.Items[item].SetSize(Vector{int32(size.X * float32(cont.Size.X)), int32(size.Y * float32(cont.Size.Y))})
+func (cont *ContainerBase) ResizeItemToFraction(index int, size FractionVector) {
+	cont.Items[index].SetSize(Vector{int32(size.X * float32(cont.Size.X)), int32(size.Y * float32(cont.Size.Y))})
+}
+
+// AddItem adds an item to the container
+func (cont *ContainerBase) AddItem(item Item) {
+	cont.Items = append(cont.Items, item)
+}
+
+// GetItem gets an item from the container
+func (cont *ContainerBase) GetItem(index int) (item Item) {
+	return cont.Items[index]
+}
+
+// GetItems gets all child items of a container
+func (cont *ContainerBase) GetItems() []Item {
+	return cont.Items
+}
+
+// GetIsLink tells wether this container is used as a link to another XML file
+func (cont *ContainerBase) GetIsLink() bool {
+	return cont.IsLink
+}
+
+// SetLink sets wether this is used as a link
+func (cont *ContainerBase) SetLink(isLink bool) {
+	cont.IsLink = isLink
+}
+
+/*
+####################################################################
+# Section: Basic item types
+####################################################################
+*/
+
+/*
+########################
+# Subsection: BaseContainer
+########################
+*/
+
+// BaseContainer is the first (and the most important) item.
+// It is used to group other items.
+type BaseContainer struct {
+	ContainerBase
 }
 
 // Draw draws a container onto a surface
 // The container will let each item draw onto its own surface and then draw that onto the main surface
 func (cont *BaseContainer) Draw(surf *sdl.Surface) (err error) {
-
 	// let each item draw onto the surface
 	for _, val := range cont.Items {
-		isurface, err := sdl.CreateRGBSurface(0, val.GetSize().X, val.GetSize().Y, 32, 0, 0, 0, 0)
+		// get size and position of the item
+		pos := val.GetPosition()
+		size := val.GetSize()
+
+		isurface, err := sdl.CreateRGBSurface(0, size.X, size.Y, 32, 0, 0, 0, 0)
 		if err != nil {
 			return err
 		}
@@ -137,9 +223,6 @@ func (cont *BaseContainer) Draw(surf *sdl.Surface) (err error) {
 			return err
 		}
 
-		pos := val.GetPosition()
-		size := val.GetSize()
-
 		// draw the item surface onto the container surface
 		srcRect := sdl.Rect{X: 0, Y: 0, W: size.X, H: size.Y}
 		dstRect := sdl.Rect{X: pos.X, Y: pos.Y, W: size.X, H: size.Y}
@@ -148,22 +231,7 @@ func (cont *BaseContainer) Draw(surf *sdl.Surface) (err error) {
 		isurface.Free()
 	}
 
-	return nil
-}
-
-// AddItem adds an item to the container
-func (cont *BaseContainer) AddItem(name string, item Item) {
-	cont.Items[name] = item
-}
-
-// GetItem gets an item from the container
-func (cont *BaseContainer) GetItem(name string) (item Item) {
-	return cont.Items[name]
-}
-
-// GetItems gets all child items of a container
-func (cont *BaseContainer) GetItems() map[string]Item {
-	return cont.Items
+	return
 }
 
 // GetItemAt gets you the item at position pos
@@ -184,112 +252,18 @@ func (cont *BaseContainer) GetItemAt(pos Vector) Item {
 	return cont
 }
 
-// Getters and setters
-
-// GetPosition returns the position
-func (cont *BaseContainer) GetPosition() (position Vector) {
-	return cont.Position
-}
-
-// SetPosition sets the position
-func (cont *BaseContainer) SetPosition(position Vector) {
-	cont.Position = position
-}
-
-// GetSize returns the size
-func (cont *BaseContainer) GetSize() (size Vector) {
-	return cont.Size
-}
-
-// SetSize sets the size
-func (cont *BaseContainer) SetSize(size Vector) {
-	cont.Size = size
-}
-
-// GetEvent returns the name of the function to call
-// when event is invoked
-func (cont *BaseContainer) GetEvent(event string) (f string) {
-	return cont.Events[event]
-}
-
-// GetEvents returns a map of all event assignments
-func (cont *BaseContainer) GetEvents() map[string]string {
-	return cont.Events
-}
-
-// GetIsLink tells wether this container is used as a link to another XML file
-func (cont *BaseContainer) GetIsLink() bool {
-	return cont.IsLink
-}
-
-// SetLink sets wether this is used as a link
-func (cont *BaseContainer) SetLink(isLink bool) {
-	cont.IsLink = isLink
-}
-
-/*
-####################################################################
-# Section: Basic item types
-####################################################################
-*/
-
 /*
 ########################
 # Subsection: ListContainer
 ########################
 */
 
-// ItemEntry is an entry to a ListContainer item map
-type ItemEntry struct {
-	Index int
-	Item  Item
-}
-
 // ListContainer groups, just like a normal container,
 // items, but unlike the normal container
 // it wont stack them ontop of each other but list them
 // below each other
 type ListContainer struct {
-	Position Vector
-	Size     Vector
-	Events   map[string]string
-
-	BGcolor uint32
-	Items   map[string]ItemEntry
-	IsLink  bool
-}
-
-// MoveItem moves the item to a pixel position
-// This will determine its margin
-func (cont *ListContainer) MoveItem(item string, pos Vector) {
-	cont.Items[item].Item.SetPosition(pos)
-}
-
-// MoveItemToFraction moves the item to a fraction of the parent container size
-// This will determine its margin
-func (cont *ListContainer) MoveItemToFraction(item string, pos FractionVector) {
-	cont.Items[item].Item.SetPosition(Vector{int32(pos.X * float32(cont.Size.X)), int32(pos.Y * float32(cont.Size.Y))})
-}
-
-// ResizeItem resizes an Item to a specific pixel size
-func (cont *ListContainer) ResizeItem(item string, size Vector) {
-	cont.Items[item].Item.SetSize(size)
-}
-
-// ResizeItemToFraction resizes an Item to a fraction of the parent container size
-func (cont *ListContainer) ResizeItemToFraction(item string, size FractionVector) {
-	cont.Items[item].Item.SetSize(Vector{int32(size.X * float32(cont.Size.X)), int32(size.Y * float32(cont.Size.Y))})
-}
-
-func (cont *ListContainer) getSortedItems() (items []Item) {
-	items = make([]Item, len(cont.Items))
-
-	// Put items in correct order
-	for _, val := range cont.Items {
-		items[val.Index] = val.Item
-	}
-
-	return
+	ContainerBase
 }
 
 // Draw draws a listcontainer onto a surface
@@ -300,7 +274,7 @@ func (cont *ListContainer) Draw(surf *sdl.Surface) (err error) {
 	yoffset := int32(0)
 
 	// let each item draw onto the surface
-	for _, item := range cont.getSortedItems() {
+	for _, item := range cont.Items {
 		pos := item.GetPosition()
 		size := item.GetSize()
 
@@ -336,30 +310,11 @@ func (cont *ListContainer) Draw(surf *sdl.Surface) (err error) {
 	return nil
 }
 
-// AddItem adds an item to the container
-func (cont *ListContainer) AddItem(name string, item Item) {
-	// index is one bigger than the last one
-	cont.Items[name] = ItemEntry{len(cont.Items), item}
-}
-
-// GetItem gets an item from the container
-func (cont *ListContainer) GetItem(name string) (item Item) {
-	return cont.Items[name].Item
-}
-
-// GetItems gets all child items of a container
-func (cont *ListContainer) GetItems() (items map[string]Item) {
-	for key, val := range cont.Items {
-		items[key] = val.Item
-	}
-	return
-}
-
 // GetItemAt gets you the item at position pos
 func (cont *ListContainer) GetItemAt(pos Vector) Item {
 	var yoffset int32
 
-	for _, item := range cont.getSortedItems() {
+	for _, item := range cont.Items {
 		position := item.GetPosition()
 		size := item.GetSize()
 
@@ -377,48 +332,6 @@ func (cont *ListContainer) GetItemAt(pos Vector) Item {
 	return cont
 }
 
-// Getters and setters
-
-// GetPosition returns the position
-func (cont *ListContainer) GetPosition() (position Vector) {
-	return cont.Position
-}
-
-// SetPosition sets the position
-func (cont *ListContainer) SetPosition(position Vector) {
-	cont.Position = position
-}
-
-// GetSize returns the size
-func (cont *ListContainer) GetSize() (size Vector) {
-	return cont.Size
-}
-
-// SetSize sets the size
-func (cont *ListContainer) SetSize(size Vector) {
-	cont.Size = size
-}
-
-// GetEvent gets the name of the function to call when event is invoked
-func (cont *ListContainer) GetEvent(event string) (f string) {
-	return cont.Events[event]
-}
-
-// GetEvents returns a map of event assignments
-func (cont *ListContainer) GetEvents() map[string]string {
-	return cont.Events
-}
-
-// GetIsLink returns wether the container is used as a link to another XML file
-func (cont *ListContainer) GetIsLink() bool {
-	return cont.IsLink
-}
-
-// SetLink sets wether this is used as a link
-func (cont *ListContainer) SetLink(isLink bool) {
-	cont.IsLink = isLink
-}
-
 /*
 ########################
 # Subsection: Label
@@ -427,9 +340,7 @@ func (cont *ListContainer) SetLink(isLink bool) {
 
 // Label is an item that holds basic, short text
 type Label struct {
-	Position Vector
-	Size     Vector
-	Events   map[string]string
+	ItemBase
 
 	Text     string
 	Textsize int
@@ -503,38 +414,6 @@ func (label *Label) Draw(surf *sdl.Surface) (err error) {
 	return
 }
 
-// Getters and setters
-
-// GetPosition returns the position
-func (label *Label) GetPosition() (position Vector) {
-	return label.Position
-}
-
-// SetPosition sets the position
-func (label *Label) SetPosition(newposition Vector) {
-	label.Position = newposition
-}
-
-// GetSize returns the size
-func (label *Label) GetSize() (size Vector) {
-	return label.Size
-}
-
-// SetSize sets the size
-func (label *Label) SetSize(newsize Vector) {
-	label.Size = newsize
-}
-
-// GetEvent gets the name of the function to call when event is invoked
-func (label *Label) GetEvent(event string) (f string) {
-	return label.Events[event]
-}
-
-// GetEvents returns a map of event assignments
-func (label *Label) GetEvents() map[string]string {
-	return label.Events
-}
-
 /*
 ########################
 # Subsection: Texture
@@ -543,9 +422,7 @@ func (label *Label) GetEvents() map[string]string {
 
 // Texture is an item containing a texture/picture
 type Texture struct {
-	Position Vector
-	Size     Vector
-	Events   map[string]string
+	ItemBase
 
 	Texture *sdl.Surface
 }
@@ -559,38 +436,6 @@ func (tex *Texture) Draw(surf *sdl.Surface) (err error) {
 	return nil
 }
 
-// Getters and setters
-
-// GetPosition returns the position
-func (tex *Texture) GetPosition() (position Vector) {
-	return tex.Position
-}
-
-// SetPosition sets the position
-func (tex *Texture) SetPosition(position Vector) {
-	tex.Position = position
-}
-
-// GetSize returns the size
-func (tex *Texture) GetSize() (size Vector) {
-	return tex.Size
-}
-
-// SetSize sets the size
-func (tex *Texture) SetSize(size Vector) {
-	tex.Size = size
-}
-
-// GetEvent returns the name of the function to call when event is invoked
-func (tex *Texture) GetEvent(event string) (f string) {
-	return tex.Events[event]
-}
-
-// GetEvents returns a list of event assignments
-func (tex *Texture) GetEvents() map[string]string {
-	return tex.Events
-}
-
 /*
 ########################
 # Subsection: Unicolor
@@ -599,9 +444,7 @@ func (tex *Texture) GetEvents() map[string]string {
 
 // Unicolor is an item with just one color
 type Unicolor struct {
-	Position Vector
-	Size     Vector
-	Events   map[string]string
+	ItemBase
 
 	Color uint32
 }
@@ -610,36 +453,4 @@ type Unicolor struct {
 func (unic *Unicolor) Draw(surf *sdl.Surface) (err error) {
 	rect := sdl.Rect{X: 0, Y: 0, W: unic.Size.X, H: unic.Size.Y}
 	return surf.FillRect(&rect, unic.Color)
-}
-
-// Getters and setters
-
-// GetPosition returns the position
-func (unic *Unicolor) GetPosition() (position Vector) {
-	return unic.Position
-}
-
-// SetPosition sets the position
-func (unic *Unicolor) SetPosition(position Vector) {
-	unic.Position = position
-}
-
-// GetSize returns the size
-func (unic *Unicolor) GetSize() (size Vector) {
-	return unic.Size
-}
-
-// SetSize sets the size
-func (unic *Unicolor) SetSize(size Vector) {
-	unic.Size = size
-}
-
-// GetEvent gets the name of the function to call when event is invoked
-func (unic *Unicolor) GetEvent(event string) (f string) {
-	return unic.Events[event]
-}
-
-// GetEvents gets a map of event assignments
-func (unic *Unicolor) GetEvents() map[string]string {
-	return unic.Events
 }
