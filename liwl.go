@@ -26,6 +26,8 @@ func main() {
 	}
 
 	// TODO use arg instead of predefined strings
+	//cli.RunCommand("build", "/home/lukas/swayland/files/home/.scripts/sidebar/power")
+	//cli.RunCommand("run", "/home/lukas/swayland/files/home/.scripts/sidebar/power")
 	cli.RunCommand("build", "/home/lukas/go/src/fliwexamples/basic")
 	cli.RunCommand("run", "/home/lukas/go/src/fliwexamples/basic")
 }

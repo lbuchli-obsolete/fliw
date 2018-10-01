@@ -92,6 +92,8 @@ func (base XMLBase) getUID() uint {
 	return base.UID
 }
 
+var prevItemContent map[uint]*data.Item
+
 // gets a list of items in the container
 func (base XMLContainerBase) getItemList(psize data.Vector, plugin string) (list []data.Item, size data.Vector) {
 	// get the size
@@ -220,6 +222,7 @@ var uidIndex uint
 func UnmarshalXMLFile(path string) (window XMLWindow, windowtype uint32, err error) {
 	dirpath = path
 	staticItems = make(map[uint]*data.Item)
+	prevItemContent = make(map[uint]*data.Item)
 
 	// open the file
 	file, err := ioutil.ReadFile(path + "/style.xml")
@@ -302,15 +305,45 @@ func validateXMLFile(file []byte, xsdpath string) (valid bool, err error) {
 func parseItem(item XMLItem, psize data.Vector, plugin string) data.Item {
 	if item.isStatic(plugin) {
 		if val, ok := staticItems[item.getUID()]; ok {
+			if testItemChange(val) {
+				(*val).SetHasChanged(false)
+			} else {
+				(*val).SetHasChanged(true)
+			}
+			prevItemContent[item.getUID()] = val
 			return *val
 		} else {
 			val := item.parse(psize, plugin)
+			// something definetly has changed if the item is static but not in the statics map
+			// so there's no need to check for changes
+			prevItemContent[item.getUID()] = &val
+
 			staticItems[item.getUID()] = &val
 			return val
 		}
 	}
 
-	return item.parse(psize, plugin)
+	val := item.parse(psize, plugin)
+	if testItemChange(&val) {
+		val.SetHasChanged(false)
+	} else {
+		val.SetHasChanged(true)
+	}
+
+	prevItemContent[item.getUID()] = &val
+	return val
+}
+
+func testItemChange(item *data.Item) bool {
+	prev, ok := prevItemContent[(*item).GetUID()]
+
+	if ok {
+		if *prev == *item {
+			return true
+		}
+	}
+
+	return false
 }
 
 // recursively assigns a UID to the container and all its children

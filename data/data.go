@@ -69,6 +69,8 @@ type Item interface {
 	SetSize(Vector)
 	GetEvent(string) string
 	GetEvents() map[string]string
+	SetHasChanged(bool)
+	HasChanged() bool
 }
 
 // Container is an item containing other items.
@@ -91,6 +93,7 @@ type ItemBase struct {
 	Position Vector
 	Size     Vector
 	Events   map[string]string
+	Changed  bool
 }
 
 // GetUID returns the unique identifier of the item
@@ -127,6 +130,17 @@ func (base *ItemBase) GetEvent(event string) (f string) {
 // GetEvents returns a map of all event assignments
 func (base *ItemBase) GetEvents() map[string]string {
 	return base.Events
+}
+
+// SetHasChanged sets if the item has been changed since the last frame.
+// This function is usually only called by the xml parser.
+func (base *ItemBase) SetHasChanged(hasChanged bool) {
+	base.Changed = hasChanged
+}
+
+// HasChanged returns if the item content or size has changed since the last frame.
+func (base *ItemBase) HasChanged() (hasChanged bool) {
+	return base.Changed
 }
 
 // ContainerBase is the base for every container struct

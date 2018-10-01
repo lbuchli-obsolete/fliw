@@ -1,8 +1,8 @@
 package image
 
 import (
-	"encoding/binary"
 	"image"
+	"image/color"
 	"os"
 	"unsafe"
 
@@ -30,8 +30,8 @@ func ImgToSurface(img image.Image) (surface *sdl.Surface, err error) {
 
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
-			c := img.At(x, y)
-			rgba.Set(x, y, c)
+			r, g, b, a := img.At(x, y).RGBA()
+			rgba.Set(x, y, color.RGBA{uint8(b), uint8(g), uint8(r), uint8(a)})
 		}
 	}
 
@@ -40,32 +40,22 @@ func ImgToSurface(img image.Image) (surface *sdl.Surface, err error) {
 
 // ResizeSurface scales a surface down to a given size
 func ResizeSurface(surf *sdl.Surface, newx int32, newy int32) (resizedsurf *sdl.Surface, err error) {
-	resizedsurf, err = sdl.CreateRGBSurface(0, newx, newy, 32, 0, 0, 0, 0)
+	var scale float64
+
+	if (surf.W - newx) > (surf.H - newy) {
+		scale = float64(newx) / float64(surf.W)
+	} else {
+		scale = float64(newy) / float64(surf.H)
+	}
+
+	resizedsurf, err = sdl.CreateRGBSurface(0, int32(float64(surf.W)*scale), int32(float64(surf.H)*scale), 32, 0, 0, 0, 0)
 	if err != nil {
 		return resizedsurf, err
 	}
 
-	rgba := image.NewRGBA(image.Rect(0, 0, int(newx), int(newy)))
-	rgba.Pix = resizedsurf.Pixels()
+	surf.BlitScaled(&sdl.Rect{X: 0, Y: 0, W: surf.W, H: surf.H}, resizedsurf, &sdl.Rect{X: 0, Y: 0, W: resizedsurf.W, H: resizedsurf.H})
 
-	pixels := surf.Pixels()
-
-	// the factor from newscale to oldscale
-	scalex := float32(surf.W) / float32(newx)
-	scaley := float32(surf.H) / float32(newy)
-
-	for y := int32(0); y < newy; y++ {
-		for x := int32(0); x < newx; x++ {
-			// the byte index of the color currently looking at
-			index := int32((float32(surf.BytesPerPixel()) * (float32(surf.W*y) * scaley)) +
-				(float32(int32(surf.BytesPerPixel())*x) * scalex))
-
-			// set the pixel using magic
-			rgba.Set(int(x), int(y), UInt32ToColor(binary.BigEndian.Uint32(pixels[index:index+4])))
-		}
-	}
-
-	return resizedsurf, err
+	return
 }
 
 // FromFile loads an image from an existing file
